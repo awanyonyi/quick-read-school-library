@@ -58,6 +58,7 @@ export const initializeDefaultData = () => {
         name: 'John Doe',
         admissionNumber: 'STD001',
         email: 'john.doe@school.edu',
+        class: 'Grade 10A',
         registeredDate: new Date().toISOString()
       },
       {
@@ -65,6 +66,7 @@ export const initializeDefaultData = () => {
         name: 'Jane Smith',
         admissionNumber: 'STD002',
         email: 'jane.smith@school.edu',
+        class: 'Grade 10B',
         registeredDate: new Date().toISOString()
       },
       {
@@ -72,6 +74,7 @@ export const initializeDefaultData = () => {
         name: 'Mike Johnson',
         admissionNumber: 'STD003',
         email: 'mike.johnson@school.edu',
+        class: 'Grade 11A',
         registeredDate: new Date().toISOString()
       }
     ];

@@ -15,6 +15,7 @@ export interface Student {
   name: string;
   admissionNumber: string;
   email: string;
+  class: string;
   registeredDate: string;
 }
 

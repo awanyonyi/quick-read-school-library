@@ -22,7 +22,8 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
   const [formData, setFormData] = useState({
     name: '',
     admissionNumber: '',
-    email: ''
+    email: '',
+    class: ''
   });
 
   useEffect(() => {
@@ -37,7 +38,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.admissionNumber || !formData.email) {
+    if (!formData.name || !formData.admissionNumber || !formData.email || !formData.class) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -113,7 +114,8 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
     setFormData({
       name: '',
       admissionNumber: '',
-      email: ''
+      email: '',
+      class: ''
     });
     setEditingStudent(null);
     setIsAddDialogOpen(false);
@@ -124,7 +126,8 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
     setFormData({
       name: student.name,
       admissionNumber: student.admissionNumber,
-      email: student.email
+      email: student.email,
+      class: student.class
     });
     setIsAddDialogOpen(true);
   };
@@ -174,6 +177,16 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
                       value={formData.admissionNumber}
                       onChange={(e) => setFormData({...formData, admissionNumber: e.target.value})}
                       placeholder="Enter admission number"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="class">Class *</Label>
+                    <Input
+                      id="class"
+                      value={formData.class}
+                      onChange={(e) => setFormData({...formData, class: e.target.value})}
+                      placeholder="Enter class (e.g., Grade 10A)"
                       required
                     />
                   </div>
@@ -234,6 +247,9 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
                           <span className="text-sm">
                             Admission: <span className="font-medium">{student.admissionNumber}</span>
                           </span>
+                          <span className="text-sm">
+                            Class: <span className="font-medium">{student.class}</span>
+                          </span>
                           <span className="text-sm text-gray-500">
                             Registered: {new Date(student.registeredDate).toLocaleDateString()}
                           </span>
@@ -271,7 +287,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
                     Add Your First Student
                   </Button>
                 </div>
-              </div>
+                </div>
             )}
           </div>
         </CardContent>

@@ -23,14 +23,14 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
   const downloadTemplate = () => {
     const templateData = [
       {
-        'Student Name': 'John Doe',
         'Admission Number': 'STD001',
-        'Email': 'john.doe@school.edu'
+        'Student Name': 'John Doe',
+        'Class': 'Grade 10A'
       },
       {
-        'Student Name': 'Jane Smith',
         'Admission Number': 'STD002',
-        'Email': 'jane.smith@school.edu'
+        'Student Name': 'Jane Smith',
+        'Class': 'Grade 10B'
       }
     ];
 
@@ -70,11 +70,11 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
         // Extract data with flexible column naming
         const name = row['Student Name'] || row['Name'] || row['student_name'] || row['name'];
         const admissionNumber = row['Admission Number'] || row['AdmissionNumber'] || row['admission_number'] || row['ID'];
-        const email = row['Email'] || row['email'] || row['Email Address'] || row['email_address'];
+        const studentClass = row['Class'] || row['class'] || row['Grade'] || row['grade'];
 
         // Validate required fields
-        if (!name || !admissionNumber || !email) {
-          errors.push(`Row ${rowNumber}: Missing required fields (Name: ${name || 'missing'}, Admission: ${admissionNumber || 'missing'}, Email: ${email || 'missing'})`);
+        if (!name || !admissionNumber || !studentClass) {
+          errors.push(`Row ${rowNumber}: Missing required fields (Name: ${name || 'missing'}, Admission: ${admissionNumber || 'missing'}, Class: ${studentClass || 'missing'})`);
           return;
         }
 
@@ -98,19 +98,14 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
           return;
         }
 
-        // Validate email format
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(String(email))) {
-          errors.push(`Row ${rowNumber}: Invalid email format for ${email}`);
-          return;
-        }
-
-        // Create new student
+        // Create new student with generated email
+        const generatedEmail = `${String(admissionNumber).toLowerCase()}@school.edu`;
         const newStudent: Student = {
           id: `std_${Date.now()}_${index}`,
           name: String(name).trim(),
           admissionNumber: String(admissionNumber).trim(),
-          email: String(email).trim().toLowerCase(),
+          email: generatedEmail,
+          class: String(studentClass).trim(),
           registeredDate: new Date().toISOString()
         };
 
@@ -197,7 +192,7 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
             disabled={isUploading}
           />
           <p className="text-sm text-gray-500">
-            Accepted formats: .xlsx, .xls. Required columns: Student Name, Admission Number, Email
+            Accepted formats: .xlsx, .xls. Required columns: Admission Number, Student Name, Class
           </p>
         </div>
 
@@ -249,10 +244,10 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="font-medium text-gray-900 mb-2">Excel File Requirements:</h4>
           <ul className="text-sm text-gray-700 space-y-1">
-            <li>• Column headers: "Student Name", "Admission Number", "Email"</li>
+            <li>• Column headers: "Admission Number", "Student Name", "Class"</li>
             <li>• All three columns are required for each student</li>
             <li>• Admission numbers must be unique</li>
-            <li>• Email addresses must be valid</li>
+            <li>• Email addresses will be auto-generated based on admission number</li>
             <li>• First row should contain column headers</li>
           </ul>
         </div>
