@@ -113,6 +113,24 @@ export const WeeklyReport: React.FC<WeeklyReportProps> = ({ onUpdate }) => {
 
   return (
     <div className="space-y-6">
+      {/* Print styles */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @media print {
+            @page {
+              size: A4;
+              margin: 1in;
+            }
+            .print\\:hidden {
+              display: none !important;
+            }
+            .print\\:block {
+              display: block !important;
+            }
+          }
+        `
+      }} />
+
       {/* Controls - Hidden when printing */}
       <div className="print:hidden flex justify-between items-center">
         <div>
@@ -303,21 +321,6 @@ export const WeeklyReport: React.FC<WeeklyReportProps> = ({ onUpdate }) => {
       <div className="print:block hidden text-center text-sm text-gray-600 mt-8">
         <p>Generated on {format(new Date(), 'PPP')} by School Library Management System</p>
       </div>
-
-      <style jsx>{`
-        @media print {
-          @page {
-            size: A4;
-            margin: 1in;
-          }
-          .print\\:hidden {
-            display: none !important;
-          }
-          .print\\:block {
-            display: block !important;
-          }
-        }
-      `}</style>
     </div>
   );
 };
