@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { BookManagement } from './BookManagement';
 import { StudentManagement } from './StudentManagement';
 import { BorrowingManagement } from './BorrowingManagement';
+import { WeeklyReport } from './WeeklyReport';
 import { 
   BookOpen, 
   Users, 
@@ -15,7 +15,8 @@ import {
   AlertTriangle, 
   LogOut,
   Library,
-  TrendingUp
+  TrendingUp,
+  FileText
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -51,7 +52,8 @@ const AdminDashboard = () => {
     { id: 'overview', label: 'Overview', icon: Library },
     { id: 'books', label: 'Books', icon: BookOpen },
     { id: 'students', label: 'Students', icon: Users },
-    { id: 'borrowing', label: 'Borrowing', icon: Clock }
+    { id: 'borrowing', label: 'Borrowing', icon: Clock },
+    { id: 'reports', label: 'Weekly Reports', icon: FileText }
   ];
 
   return (
@@ -203,6 +205,7 @@ const AdminDashboard = () => {
         {activeTab === 'books' && <BookManagement onUpdate={loadData} />}
         {activeTab === 'students' && <StudentManagement onUpdate={loadData} />}
         {activeTab === 'borrowing' && <BorrowingManagement onUpdate={loadData} />}
+        {activeTab === 'reports' && <WeeklyReport onUpdate={loadData} />}
       </main>
     </div>
   );
