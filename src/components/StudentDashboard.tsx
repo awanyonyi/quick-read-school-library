@@ -41,7 +41,7 @@ const StudentDashboard = () => {
   const filteredBooks = books.filter(book => {
     const matchesSearch = book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          book.author.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || book category === selectedCategory;
+    const matchesCategory = selectedCategory === 'all' || book.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
