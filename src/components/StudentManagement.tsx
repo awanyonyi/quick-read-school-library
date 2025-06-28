@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Student } from '../types';
-import { Plus, Edit, Trash2, User } from 'lucide-react';
+import { Plus, Edit, Trash2, User, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { StudentExcelUpload } from './StudentExcelUpload';
 
 interface StudentManagementProps {
   onUpdate: () => void;
@@ -17,6 +18,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
   const [students, setStudents] = useState<Student[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [showExcelUpload, setShowExcelUpload] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     admissionNumber: '',
@@ -134,70 +136,85 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
           <h2 className="text-2xl font-bold text-gray-900">Student Management</h2>
           <p className="text-gray-600">Manage student registrations and information</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setIsAddDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Student
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>{editingStudent ? 'Edit Student' : 'Add New Student'}</DialogTitle>
-              <DialogDescription>
-                {editingStudent ? 'Update student information' : 'Register a new student in the library system'}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit}>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    placeholder="Enter student name"
-                    required
-                  />
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={() => setShowExcelUpload(!showExcelUpload)}>
+            <Upload className="h-4 w-4 mr-2" />
+            {showExcelUpload ? 'Hide' : 'Bulk Upload'}
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Student
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>{editingStudent ? 'Edit Student' : 'Add New Student'}</DialogTitle>
+                <DialogDescription>
+                  {editingStudent ? 'Update student information' : 'Register a new student in the library system'}
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit}>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Full Name *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      placeholder="Enter student name"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="admission">Admission Number *</Label>
+                    <Input
+                      id="admission"
+                      value={formData.admissionNumber}
+                      onChange={(e) => setFormData({...formData, admissionNumber: e.target.value})}
+                      placeholder="Enter admission number"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      placeholder="Enter email address"
+                      required
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="admission">Admission Number *</Label>
-                  <Input
-                    id="admission"
-                    value={formData.admissionNumber}
-                    onChange={(e) => setFormData({...formData, admissionNumber: e.target.value})}
-                    placeholder="Enter admission number"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    placeholder="Enter email address"
-                    required
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={resetForm}>
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  {editingStudent ? 'Update Student' : 'Add Student'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={resetForm}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">
+                    {editingStudent ? 'Update Student' : 'Add Student'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
+
+      {/* Excel Upload Section */}
+      {showExcelUpload && (
+        <StudentExcelUpload onUploadComplete={() => {
+          loadStudents();
+          onUpdate();
+          setShowExcelUpload(false);
+        }} />
+      )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Registered Students</CardTitle>
+          <CardTitle>Registered Students ({students.length})</CardTitle>
           <CardDescription>All students registered in the library system</CardDescription>
         </CardHeader>
         <CardContent>
@@ -244,10 +261,16 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
               <div className="text-center py-12">
                 <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500 mb-4">No students registered yet</p>
-                <Button onClick={() => setIsAddDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Your First Student
-                </Button>
+                <div className="flex justify-center space-x-2">
+                  <Button onClick={() => setShowExcelUpload(true)} variant="outline">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Bulk Upload
+                  </Button>
+                  <Button onClick={() => setIsAddDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Your First Student
+                  </Button>
+                </div>
               </div>
             )}
           </div>
