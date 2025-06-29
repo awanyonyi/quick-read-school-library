@@ -5,9 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, User, Lock, AlertCircle } from 'lucide-react';
+import { BookOpen, User, Lock, AlertCircle, ArrowLeft } from 'lucide-react';
 
-const LoginForm = () => {
+interface LoginFormProps {
+  onBackToHome?: () => void;
+}
+
+const LoginForm = ({ onBackToHome }: LoginFormProps) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -31,14 +35,27 @@ const LoginForm = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-green-50 p-4">
       <div className="w-full max-w-md">
+        {onBackToHome && (
+          <div className="mb-6">
+            <Button
+              variant="ghost"
+              onClick={onBackToHome}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+          </div>
+        )}
+
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <div className="bg-blue-600 p-4 rounded-full">
               <BookOpen className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">School Library</h1>
-          <p className="text-gray-600">Management System</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Maryland Secondary School</h1>
+          <p className="text-gray-600">Library Management System</p>
         </div>
 
         <Card className="shadow-lg border-0">

@@ -1,13 +1,15 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { initializeDefaultData } from '../utils/libraryData';
 import LoginForm from '../components/LoginForm';
 import AdminDashboard from '../components/AdminDashboard';
 import StudentDashboard from '../components/StudentDashboard';
+import HomePage from '../components/HomePage';
 
 const MainApp = () => {
   const { user, isLoading } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
     // Initialize default data on app startup
@@ -25,11 +27,17 @@ const MainApp = () => {
     );
   }
 
-  if (!user) {
-    return <LoginForm />;
+  // If user is logged in, show appropriate dashboard
+  if (user) {
+    return user.role === 'admin' ? <AdminDashboard /> : <StudentDashboard />;
   }
 
-  return user.role === 'admin' ? <AdminDashboard /> : <StudentDashboard />;
+  // If no user is logged in, show either home page or login form
+  if (showLogin) {
+    return <LoginForm onBackToHome={() => setShowLogin(false)} />;
+  }
+
+  return <HomePage onShowLogin={() => setShowLogin(true)} />;
 };
 
 const Index = () => {
