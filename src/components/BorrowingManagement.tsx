@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -321,7 +320,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
         </Card>
       </div>
 
-      {/* Active Borrowings */}
+      {/* Active Borrowings - Updated to include ISBN */}
       <Card>
         <CardHeader>
           <CardTitle>Active Borrowings</CardTitle>
@@ -346,6 +345,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                         <div className="flex-1">
                           <h3 className="font-semibold">{book?.title || 'Unknown Book'}</h3>
                           <p className="text-gray-600">by {book?.author || 'Unknown Author'}</p>
+                          <p className="text-sm text-gray-500">ISBN: {book?.isbn || 'N/A'}</p>
                           <div className="flex items-center space-x-2 mt-2">
                             <User className="h-4 w-4 text-gray-400" />
                             <span className="text-sm">{student?.name || 'Unknown Student'}</span>
@@ -394,7 +394,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
         </CardContent>
       </Card>
 
-      {/* Recent Returns */}
+      {/* Recent Returns - Updated to include ISBN */}
       <Card>
         <CardHeader>
           <CardTitle>Recent Returns</CardTitle>
@@ -421,6 +421,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                           <div className="flex-1">
                             <h3 className="font-semibold">{book?.title || 'Unknown Book'}</h3>
                             <p className="text-gray-600">by {book?.author || 'Unknown Author'}</p>
+                            <p className="text-sm text-gray-500">ISBN: {book?.isbn || 'N/A'}</p>
                             <div className="flex items-center space-x-2 mt-2">
                               <User className="h-4 w-4 text-gray-400" />
                               <span className="text-sm">{student?.name || 'Unknown Student'}</span>
