@@ -24,12 +24,12 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
     const templateData = [
       {
         'Admission Number': 'STD001',
-        'Student Name': 'John Doe',
+        'Name': 'John Doe',
         'Class': 'Grade 10A'
       },
       {
         'Admission Number': 'STD002',
-        'Student Name': 'Jane Smith',
+        'Name': 'Jane Smith',
         'Class': 'Grade 10B'
       }
     ];
@@ -54,69 +54,105 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
     setUploadResults(null);
 
     try {
+      console.log('Processing Excel file:', file.name);
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      console.log('Raw Excel data:', jsonData);
+      console.log('Number of rows found:', jsonData.length);
+
+      if (jsonData.length === 0) {
+        toast({
+          title: "Upload Error",
+          description: "No data found in Excel file. Please check the file format.",
+          variant: "destructive"
+        });
+        setIsUploading(false);
+        return;
+      }
 
       const existingStudents = JSON.parse(localStorage.getItem('library_students') || '[]');
       const newStudents: Student[] = [];
       const errors: string[] = [];
       let successCount = 0;
 
+      // Log the first row to see what columns we have
+      if (jsonData.length > 0) {
+        console.log('Available columns:', Object.keys(jsonData[0]));
+      }
+
       jsonData.forEach((row: any, index: number) => {
         const rowNumber = index + 2; // Excel row number (starting from 2, accounting for header)
         
-        // Extract data with flexible column naming
-        const name = row['Student Name'] || row['Name'] || row['student_name'] || row['name'];
-        const admissionNumber = row['Admission Number'] || row['AdmissionNumber'] || row['admission_number'] || row['ID'];
-        const studentClass = row['Class'] || row['class'] || row['Grade'] || row['grade'];
+        console.log(`Processing row ${rowNumber}:`, row);
+        
+        // More flexible column matching - handle various naming conventions
+        const name = row['Name'] || row['Student Name'] || row['name'] || row['student_name'] || row['NAME'];
+        const admissionNumber = row['Admission Number'] || row['AdmissionNumber'] || row['admission_number'] || row['ID'] || row['ADMISSION NUMBER'];
+        const studentClass = row['Class'] || row['class'] || row['Grade'] || row['grade'] || row['CLASS'];
+
+        console.log(`Row ${rowNumber} extracted values:`, { name, admissionNumber, studentClass });
 
         // Validate required fields
         if (!name || !admissionNumber || !studentClass) {
-          errors.push(`Row ${rowNumber}: Missing required fields (Name: ${name || 'missing'}, Admission: ${admissionNumber || 'missing'}, Class: ${studentClass || 'missing'})`);
+          const missingFields = [];
+          if (!name) missingFields.push('Name');
+          if (!admissionNumber) missingFields.push('Admission Number');
+          if (!studentClass) missingFields.push('Class');
+          
+          errors.push(`Row ${rowNumber}: Missing required fields: ${missingFields.join(', ')}`);
+          console.log(`Row ${rowNumber} validation failed - missing:`, missingFields);
           return;
         }
 
         // Check for duplicate admission numbers in existing data
         const existingStudent = existingStudents.find((student: Student) => 
-          student.admissionNumber === String(admissionNumber)
+          student.admissionNumber === String(admissionNumber).trim()
         );
         
         if (existingStudent) {
           errors.push(`Row ${rowNumber}: Admission number ${admissionNumber} already exists`);
+          console.log(`Row ${rowNumber} duplicate admission number:`, admissionNumber);
           return;
         }
 
         // Check for duplicate admission numbers in current upload
         const duplicateInUpload = newStudents.find(student => 
-          student.admissionNumber === String(admissionNumber)
+          student.admissionNumber === String(admissionNumber).trim()
         );
         
         if (duplicateInUpload) {
           errors.push(`Row ${rowNumber}: Duplicate admission number ${admissionNumber} in upload`);
+          console.log(`Row ${rowNumber} duplicate in current upload:`, admissionNumber);
           return;
         }
 
         // Create new student with generated email
-        const generatedEmail = `${String(admissionNumber).toLowerCase()}@school.edu`;
+        const cleanAdmissionNumber = String(admissionNumber).trim();
+        const generatedEmail = `${cleanAdmissionNumber.toLowerCase()}@school.edu`;
         const newStudent: Student = {
           id: `std_${Date.now()}_${index}`,
           name: String(name).trim(),
-          admissionNumber: String(admissionNumber).trim(),
+          admissionNumber: cleanAdmissionNumber,
           email: generatedEmail,
           class: String(studentClass).trim(),
           registeredDate: new Date().toISOString()
         };
 
+        console.log(`Row ${rowNumber} created student:`, newStudent);
         newStudents.push(newStudent);
         successCount++;
       });
+
+      console.log('Upload results:', { successCount, errorCount: errors.length, newStudents });
 
       // Save successful entries
       if (newStudents.length > 0) {
         const updatedStudents = [...existingStudents, ...newStudents];
         localStorage.setItem('library_students', JSON.stringify(updatedStudents));
+        console.log('Saved students to localStorage:', updatedStudents.length, 'total students');
       }
 
       setUploadResults({
@@ -133,7 +169,7 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
       } else {
         toast({
           title: "Upload Failed",
-          description: "No students were uploaded due to errors",
+          description: "No students were uploaded due to errors. Check the error details below.",
           variant: "destructive"
         });
       }
@@ -192,7 +228,7 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
             disabled={isUploading}
           />
           <p className="text-sm text-gray-500">
-            Accepted formats: .xlsx, .xls. Required columns: Admission Number, Student Name, Class
+            Accepted formats: .xlsx, .xls. Required columns: <strong>Admission Number</strong>, <strong>Name</strong>, <strong>Class</strong>
           </p>
         </div>
 
@@ -244,11 +280,12 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="font-medium text-gray-900 mb-2">Excel File Requirements:</h4>
           <ul className="text-sm text-gray-700 space-y-1">
-            <li>• Column headers: "Admission Number", "Student Name", "Class"</li>
+            <li>• Column headers: <strong>"Admission Number"</strong>, <strong>"Name"</strong>, <strong>"Class"</strong></li>
             <li>• All three columns are required for each student</li>
             <li>• Admission numbers must be unique</li>
             <li>• Email addresses will be auto-generated based on admission number</li>
             <li>• First row should contain column headers</li>
+            <li>• Alternative column names are also supported (e.g., "Student Name" for "Name")</li>
           </ul>
         </div>
       </CardContent>
