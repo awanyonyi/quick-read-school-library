@@ -74,7 +74,7 @@ const LoginForm = ({ onBackToHome }: LoginFormProps) => {
                   <Input
                     id="username"
                     type="text"
-                    placeholder="Enter your name or 'librarian'"
+                    placeholder="Enter your name or admin username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="pl-10"
@@ -118,7 +118,7 @@ const LoginForm = ({ onBackToHome }: LoginFormProps) => {
             <div className="mt-6 p-4 bg-gray-50 rounded-lg">
               <h4 className="font-medium text-gray-900 mb-2">Demo Credentials:</h4>
               <div className="text-sm text-gray-600 space-y-1">
-                <div><strong>Admin:</strong> librarian / admin123</div>
+                <div><strong>Admin:</strong> Maryland@library / Maryland_lib2025</div>
                 <div><strong>Student:</strong> John Doe / STD001</div>
                 <div><strong>Student:</strong> Jane Smith / STD002</div>
               </div>

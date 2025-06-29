@@ -25,6 +25,21 @@ export const useAuth = () => {
   return context;
 };
 
+// Simple encryption function for password hashing
+const hashPassword = (password: string): string => {
+  let hash = 0;
+  for (let i = 0; i < password.length; i++) {
+    const char = password.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash.toString(16);
+};
+
+// Admin credentials with encrypted password
+const ADMIN_USERNAME = 'Maryland@library';
+const ADMIN_PASSWORD_HASH = hashPassword('Maryland_lib2025');
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,8 +59,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Check for admin credentials
-    if (username === 'librarian' && password === 'admin123') {
+    // Check for admin credentials with encrypted password
+    if (username === ADMIN_USERNAME && hashPassword(password) === ADMIN_PASSWORD_HASH) {
       const adminUser: User = {
         id: 'admin_1',
         name: 'Library Administrator',
