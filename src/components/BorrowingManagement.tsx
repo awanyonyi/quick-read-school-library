@@ -1,13 +1,14 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Book, Student, BorrowRecord } from '../types';
 import { calculateFine, getBorrowDueDate } from '../utils/libraryData';
-import { Plus, BookOpen, User, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Plus, BookOpen, User, Clock, CheckCircle, AlertTriangle, Search } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface BorrowingManagementProps {
@@ -21,6 +22,8 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
   const [selectedBookId, setSelectedBookId] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [bookSearchQuery, setBookSearchQuery] = useState('');
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
 
   useEffect(() => {
     loadData();
@@ -35,6 +38,30 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
     setStudents(studentsData);
     setBorrowRecords(recordsData);
   };
+
+  const availableBooks = books.filter(book => book.availableCopies > 0);
+
+  // Filter books based on search query
+  const filteredBooks = useMemo(() => {
+    if (!bookSearchQuery.trim()) {
+      return availableBooks;
+    }
+    return availableBooks.filter(book =>
+      book.title.toLowerCase().includes(bookSearchQuery.toLowerCase()) ||
+      book.author.toLowerCase().includes(bookSearchQuery.toLowerCase())
+    );
+  }, [availableBooks, bookSearchQuery]);
+
+  // Filter students based on search query
+  const filteredStudents = useMemo(() => {
+    if (!studentSearchQuery.trim()) {
+      return students;
+    }
+    return students.filter(student =>
+      student.name.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+      student.admissionNumber.toLowerCase().includes(studentSearchQuery.toLowerCase())
+    );
+  }, [students, studentSearchQuery]);
 
   const handleIssueBook = () => {
     if (!selectedBookId || !selectedStudentId) {
@@ -106,6 +133,8 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
 
     setSelectedBookId('');
     setSelectedStudentId('');
+    setBookSearchQuery('');
+    setStudentSearchQuery('');
     setIsIssueDialogOpen(false);
     loadData();
     onUpdate();
@@ -148,7 +177,6 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
     onUpdate();
   };
 
-  const availableBooks = books.filter(book => book.availableCopies > 0);
   const activeBorrowRecords = borrowRecords.filter(record => record.status === 'borrowed');
   const overdueRecords = activeBorrowRecords.filter(record => new Date() > new Date(record.dueDate));
 
@@ -166,41 +194,84 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
               Issue Book
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Issue Book</DialogTitle>
               <DialogDescription>
                 Select a book and student to issue a book
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
+            <div className="grid gap-6 py-4">
+              {/* Book Selection with Search */}
+              <div className="space-y-3">
                 <label className="text-sm font-medium">Select Book</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    placeholder="Search books by title or author..."
+                    value={bookSearchQuery}
+                    onChange={(e) => setBookSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
                 <Select value={selectedBookId} onValueChange={setSelectedBookId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose a book..." />
                   </SelectTrigger>
-                  <SelectContent>
-                    {availableBooks.map((book) => (
-                      <SelectItem key={book.id} value={book.id}>
-                        {book.title} - {book.author} (Available: {book.availableCopies})
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="max-h-60">
+                    {filteredBooks.length > 0 ? (
+                      filteredBooks.map((book) => (
+                        <SelectItem key={book.id} value={book.id}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{book.title}</span>
+                            <span className="text-sm text-gray-500">
+                              by {book.author} • Available: {book.availableCopies}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-gray-500 text-center">
+                        {bookSearchQuery ? 'No books found matching your search' : 'No available books'}
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+
+              {/* Student Selection with Search */}
+              <div className="space-y-3">
                 <label className="text-sm font-medium">Select Student</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    placeholder="Search by name or admission number..."
+                    value={studentSearchQuery}
+                    onChange={(e) => setStudentSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
                 <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose a student..." />
                   </SelectTrigger>
-                  <SelectContent>
-                    {students.map((student) => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.name} ({student.admissionNumber})
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="max-h-60">
+                    {filteredStudents.length > 0 ? (
+                      filteredStudents.map((student) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{student.name}</span>
+                            <span className="text-sm text-gray-500">
+                              {student.admissionNumber} • {student.class}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-gray-500 text-center">
+                        {studentSearchQuery ? 'No students found matching your search' : 'No students available'}
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
