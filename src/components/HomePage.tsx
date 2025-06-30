@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,10 +9,9 @@ interface HomePageProps {
 
 const HomePage = ({ onShowLogin }: HomePageProps) => {
   const schoolImages = [
-    "https://images.unsplash.com/photo-1523050854058-8df90110c9d1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
-    "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
-    "https://images.unsplash.com/photo-1509062522246-3755977927d7?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
-    "https://images.unsplash.com/photo-1519452575417-564c1401ecc0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80"
+    "/lovable-uploads/4966ace3-8bbd-447b-8523-60a0ff5b4e0b.png",
+    "/lovable-uploads/455cb73f-07ec-42ce-ae0e-40bdfb1cb59d.png",
+    "/lovable-uploads/ec3be63c-3db6-44c0-82fd-38309c32da32.png"
   ];
 
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
