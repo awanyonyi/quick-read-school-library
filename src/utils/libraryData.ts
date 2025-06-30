@@ -1,52 +1,74 @@
 
 import { Book, Student, BorrowRecord } from '../types';
 
+// Generate unique ISBN
+const generateUniqueISBN = (existingBooks: Book[]): string => {
+  const timestamp = Date.now().toString();
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  let isbn = `978${timestamp.slice(-6)}${random}`;
+  
+  // Ensure uniqueness
+  while (existingBooks.some(book => book.isbn === isbn)) {
+    const newRandom = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    isbn = `978${timestamp.slice(-6)}${newRandom}`;
+  }
+  
+  return isbn;
+};
+
 // Initialize default data
 export const initializeDefaultData = () => {
   // Initialize books if not exists
   if (!localStorage.getItem('library_books')) {
-    const defaultBooks: Book[] = [
+    const defaultBooks: Book[] = [];
+    
+    // Create individual copies with unique ISBNs
+    const bookTemplates = [
       {
-        id: '1',
         title: 'To Kill a Mockingbird',
         author: 'Harper Lee',
-        isbn: '9780446310789',
         category: 'Literature',
-        totalCopies: 5,
-        availableCopies: 5,
-        addedDate: new Date().toISOString()
+        copies: 5
       },
       {
-        id: '2',
         title: 'The Great Gatsby',
         author: 'F. Scott Fitzgerald',
-        isbn: '9780743273565',
         category: 'Literature',
-        totalCopies: 3,
-        availableCopies: 3,
-        addedDate: new Date().toISOString()
+        copies: 3
       },
       {
-        id: '3',
         title: 'Introduction to Algorithms',
         author: 'Thomas H. Cormen',
-        isbn: '9780262033848',
         category: 'Computer Science',
-        totalCopies: 4,
-        availableCopies: 4,
-        addedDate: new Date().toISOString()
+        copies: 4
       },
       {
-        id: '4',
         title: 'Chemistry: The Central Science',
         author: 'Theodore E. Brown',
-        isbn: '9780134414232',
         category: 'Science',
-        totalCopies: 6,
-        availableCopies: 6,
-        addedDate: new Date().toISOString()
+        copies: 6
       }
     ];
+
+    let idCounter = 1;
+    bookTemplates.forEach(template => {
+      for (let i = 0; i < template.copies; i++) {
+        const uniqueISBN = generateUniqueISBN(defaultBooks);
+        const book: Book = {
+          id: idCounter.toString(),
+          title: template.title,
+          author: template.author,
+          isbn: uniqueISBN,
+          category: template.category,
+          totalCopies: 1, // Each book is now a single copy
+          availableCopies: 1,
+          addedDate: new Date().toISOString()
+        };
+        defaultBooks.push(book);
+        idCounter++;
+      }
+    });
+
     localStorage.setItem('library_books', JSON.stringify(defaultBooks));
   }
 

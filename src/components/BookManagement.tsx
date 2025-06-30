@@ -14,6 +14,21 @@ interface BookManagementProps {
   onUpdate: () => void;
 }
 
+// Generate unique ISBN
+const generateUniqueISBN = (existingBooks: Book[]): string => {
+  const timestamp = Date.now().toString();
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  let isbn = `978${timestamp.slice(-6)}${random}`;
+  
+  // Ensure uniqueness
+  while (existingBooks.some(book => book.isbn === isbn)) {
+    const newRandom = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    isbn = `978${timestamp.slice(-6)}${newRandom}`;
+  }
+  
+  return isbn;
+};
+
 export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
   const [books, setBooks] = useState<Book[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -21,7 +36,6 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
   const [formData, setFormData] = useState({
     title: '',
     author: '',
-    isbn: '',
     category: '',
     totalCopies: 1
   });
@@ -38,7 +52,7 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.title || !formData.author || !formData.isbn || !formData.category) {
+    if (!formData.title || !formData.author || !formData.category) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -66,18 +80,30 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
         description: "Book updated successfully"
       });
     } else {
-      // Add new book
-      const newBook: Book = {
-        id: Date.now().toString(),
-        ...formData,
-        availableCopies: formData.totalCopies,
-        addedDate: new Date().toISOString()
-      };
-      booksData.push(newBook);
-      localStorage.setItem('library_books', JSON.stringify(booksData));
+      // Add new books - create individual entries for each copy
+      const newBooks: Book[] = [];
+      
+      for (let i = 0; i < formData.totalCopies; i++) {
+        const uniqueISBN = generateUniqueISBN([...booksData, ...newBooks]);
+        const newBook: Book = {
+          id: `${Date.now()}_${i}`,
+          title: formData.title,
+          author: formData.author,
+          isbn: uniqueISBN,
+          category: formData.category,
+          totalCopies: 1, // Each book is now a single copy with unique ISBN
+          availableCopies: 1,
+          addedDate: new Date().toISOString()
+        };
+        newBooks.push(newBook);
+      }
+      
+      const updatedBooksData = [...booksData, ...newBooks];
+      localStorage.setItem('library_books', JSON.stringify(updatedBooksData));
+      
       toast({
         title: "Success",
-        description: "Book added successfully"
+        description: `${formData.totalCopies} book${formData.totalCopies > 1 ? 's' : ''} added successfully with unique ISBNs`
       });
     }
     
@@ -104,7 +130,6 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
     setFormData({
       title: '',
       author: '',
-      isbn: '',
       category: '',
       totalCopies: 1
     });
@@ -117,19 +142,28 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
     setFormData({
       title: book.title,
       author: book.author,
-      isbn: book.isbn,
       category: book.category,
       totalCopies: book.totalCopies
     });
     setIsAddDialogOpen(true);
   };
 
+  // Group books by title and author for display
+  const groupedBooks = books.reduce((groups, book) => {
+    const key = `${book.title}-${book.author}`;
+    if (!groups[key]) {
+      groups[key] = [];
+    }
+    groups[key].push(book);
+    return groups;
+  }, {} as Record<string, Book[]>);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Book Management</h2>
-          <p className="text-gray-600">Add, edit, and manage library books</p>
+          <p className="text-gray-600">Add, edit, and manage library books - each copy gets a unique ISBN</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
@@ -142,7 +176,7 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
             <DialogHeader>
               <DialogTitle>{editingBook ? 'Edit Book' : 'Add New Book'}</DialogTitle>
               <DialogDescription>
-                {editingBook ? 'Update book information' : 'Add a new book to the library collection'}
+                {editingBook ? 'Update book information' : 'Add new books to the library collection. Each copy will get a unique ISBN.'}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit}>
@@ -168,16 +202,6 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="isbn">ISBN *</Label>
-                  <Input
-                    id="isbn"
-                    value={formData.isbn}
-                    onChange={(e) => setFormData({...formData, isbn: e.target.value})}
-                    placeholder="Enter ISBN"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="category">Category *</Label>
                   <Input
                     id="category"
@@ -188,7 +212,7 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="copies">Total Copies</Label>
+                  <Label htmlFor="copies">Number of Copies</Label>
                   <Input
                     id="copies"
                     type="number"
@@ -197,6 +221,7 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
                     onChange={(e) => setFormData({...formData, totalCopies: parseInt(e.target.value)})}
                     required
                   />
+                  <p className="text-xs text-gray-500">Each copy will get a unique ISBN</p>
                 </div>
               </div>
               <DialogFooter>
@@ -204,7 +229,7 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
                   Cancel
                 </Button>
                 <Button type="submit">
-                  {editingBook ? 'Update Book' : 'Add Book'}
+                  {editingBook ? 'Update Book' : 'Add Books'}
                 </Button>
               </DialogFooter>
             </form>
@@ -215,52 +240,74 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
       <Card>
         <CardHeader>
           <CardTitle>Library Collection</CardTitle>
-          <CardDescription>All books in the library system</CardDescription>
+          <CardDescription>All books in the library system (grouped by title)</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {books.map((book) => (
-              <div key={book.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-start space-x-3">
-                      <div className="bg-blue-100 p-2 rounded-lg">
-                        <BookOpen className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg">{book.title}</h3>
-                        <p className="text-gray-600">by {book.author}</p>
-                        <div className="flex items-center space-x-4 mt-2">
-                          <Badge variant="secondary">{book.category}</Badge>
-                          <span className="text-sm text-gray-500">ISBN: {book.isbn}</span>
+            {Object.entries(groupedBooks).map(([key, bookGroup]) => {
+              const firstBook = bookGroup[0];
+              const totalCopies = bookGroup.length;
+              const availableCopies = bookGroup.filter(book => book.availableCopies > 0).length;
+              
+              return (
+                <div key={key} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-start space-x-3">
+                        <div className="bg-blue-100 p-2 rounded-lg">
+                          <BookOpen className="h-5 w-5 text-blue-600" />
                         </div>
-                        <div className="flex items-center space-x-4 mt-2">
-                          <span className="text-sm">
-                            Available: <span className="font-medium text-green-600">{book.availableCopies}</span>
-                          </span>
-                          <span className="text-sm">
-                            Total: <span className="font-medium">{book.totalCopies}</span>
-                          </span>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg">{firstBook.title}</h3>
+                          <p className="text-gray-600">by {firstBook.author}</p>
+                          <div className="flex items-center space-x-4 mt-2">
+                            <Badge variant="secondary">{firstBook.category}</Badge>
+                            <span className="text-sm">
+                              Available: <span className="font-medium text-green-600">{availableCopies}</span>
+                            </span>
+                            <span className="text-sm">
+                              Total Copies: <span className="font-medium">{totalCopies}</span>
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => openEditDialog(book)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleDelete(book.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  
+                  {/* Individual book copies with their unique ISBNs */}
+                  <div className="space-y-2 mt-4 pl-12">
+                    <h4 className="font-medium text-sm text-gray-700">Individual Copies:</h4>
+                    <div className="grid gap-2">
+                      {bookGroup.map((book) => (
+                        <div key={book.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <div className="flex-1">
+                            <span className="text-sm font-mono">ISBN: {book.isbn}</span>
+                            <span className={`ml-4 text-xs px-2 py-1 rounded ${
+                              book.availableCopies > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            }`}>
+                              {book.availableCopies > 0 ? 'Available' : 'Borrowed'}
+                            </span>
+                          </div>
+                          <div className="flex space-x-1">
+                            <Button variant="outline" size="sm" onClick={() => openEditDialog(book)}>
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => handleDelete(book.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {books.length === 0 && (
               <div className="text-center py-12">
                 <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
