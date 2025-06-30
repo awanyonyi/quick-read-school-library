@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -224,7 +225,10 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                           <div className="flex flex-col">
                             <span className="font-medium">{book.title}</span>
                             <span className="text-sm text-gray-500">
-                              by {book.author} • Available: {book.availableCopies}
+                              by {book.author} • ISBN: {book.isbn || 'N/A'}
+                            </span>
+                            <span className="text-sm text-gray-500">
+                              Available: {book.availableCopies}
                             </span>
                           </div>
                         </SelectItem>
