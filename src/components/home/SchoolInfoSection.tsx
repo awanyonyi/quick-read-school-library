@@ -10,7 +10,7 @@ const SchoolInfoSection = () => {
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">About Our School</h2>
           <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-            Maryland Secondary School is a premier educational institution committed to nurturing 
+            Maryland Senior School is a premier educational Center committed to nurturing 
             academic excellence and character development in the beautiful highlands of Nakuru County.
           </p>
         </div>
