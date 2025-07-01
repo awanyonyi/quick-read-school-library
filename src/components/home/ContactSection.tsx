@@ -14,21 +14,21 @@ const ContactSection = () => {
                 <MapPin className="h-5 w-5 text-blue-600 mt-1" />
                 <div>
                   <p className="font-medium text-gray-900">Location</p>
-                  <p className="text-gray-600">Subukia Sub-County, Nakuru County, Kenya</p>
+                  <p className="text-gray-600">199 Subukia Sub-County, Nakuru County, Kenya</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
                 <Phone className="h-5 w-5 text-blue-600 mt-1" />
                 <div>
                   <p className="font-medium text-gray-900">Phone</p>
-                  <p className="text-gray-600">+254 XXX XXX XXX</p>
+                  <p className="text-gray-600">0720489621</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
                 <Mail className="h-5 w-5 text-blue-600 mt-1" />
                 <div>
                   <p className="font-medium text-gray-900">Email</p>
-                  <p className="text-gray-600">info@marylandsecondary.ac.ke</p>
+                  <p className="text-gray-600">marylandsecsch@gmail.com</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
@@ -36,7 +36,6 @@ const ContactSection = () => {
                 <div>
                   <p className="font-medium text-gray-900">Library Hours</p>
                   <p className="text-gray-600">Monday - Friday: 7:00 AM - 6:00 PM</p>
-                  <p className="text-gray-600">Saturday: 8:00 AM - 4:00 PM</p>
                 </div>
               </div>
             </div>

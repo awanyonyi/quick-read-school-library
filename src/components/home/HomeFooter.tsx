@@ -11,14 +11,19 @@ const HomeFooter = () => {
             <div className="bg-blue-600 p-2 rounded-full">
               <BookOpen className="h-5 w-5 text-white" />
             </div>
-            <h3 className="text-lg font-semibold">Maryland Secondary School</h3>
+            <h3 className="text-lg font-semibold">Maryland Senior School</h3>
           </div>
           <p className="text-gray-400 mb-4">
             Empowering minds, shaping futures - Excellence in education since our establishment
           </p>
-          <p className="text-sm text-gray-500">
-            © 2024 Maryland Secondary School. All rights reserved.
-          </p>
+          <div className="space-y-2">
+            <p className="text-sm text-gray-500">
+              © 2024 Maryland Senior School. All rights reserved.
+            </p>
+            <p className="text-sm text-gray-500">
+              Designed by Allanware
+            </p>
+          </div>
         </div>
       </div>
     </footer>
