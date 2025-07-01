@@ -26,7 +26,7 @@ const HeroSection = ({ onShowLogin }: HeroSectionProps) => {
     <section className="relative overflow-hidden">
       <div className="absolute inset-0">
         <img
-          src={schoolImages[currentImageIndex]}
+          src={schoolImages[ "/lovable-uploads/4966ace3-8bbd-447b-8523-60a0ff5b4e0b.png"]}
           alt="Maryland Secondary School"
           className="w-full h-96 object-cover transition-opacity duration-1000"
         />
@@ -35,7 +35,7 @@ const HeroSection = ({ onShowLogin }: HeroSectionProps) => {
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
         <div className="text-center">
           <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 animate-fade-in">
-            Welcome to Maryland Secondary School
+            Welcome to Maryland Senior School
           </h1>
           <p className="text-xl md:text-2xl text-white mb-8 max-w-3xl mx-auto">
             Excellence in Education - Located in the heart of Subukia Sub-County, Nakuru County
