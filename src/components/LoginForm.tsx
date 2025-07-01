@@ -54,7 +54,7 @@ const LoginForm = ({ onBackToHome }: LoginFormProps) => {
               <BookOpen className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Maryland Secondary School</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Maryland Senior School</h1>
           <p className="text-gray-600">Library Management System</p>
         </div>
 
@@ -114,15 +114,6 @@ const LoginForm = ({ onBackToHome }: LoginFormProps) => {
                 {isLoading ? 'Signing In...' : 'Sign In'}
               </Button>
             </form>
-
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-medium text-gray-900 mb-2">Demo Credentials:</h4>
-              <div className="text-sm text-gray-600 space-y-1">
-                <div><strong>Admin:</strong> Maryland@library / Maryland_lib2025</div>
-                <div><strong>Student:</strong> John Doe / STD001</div>
-                <div><strong>Student:</strong> Jane Smith / STD002</div>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
