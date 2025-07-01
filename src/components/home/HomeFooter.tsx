@@ -18,7 +18,7 @@ const HomeFooter = () => {
           </p>
           <div className="space-y-2">
             <p className="text-sm text-gray-500">
-              © 2024 Maryland Senior School. All rights reserved.
+              © 2025 Maryland Senior School. All rights reserved.
             </p>
             <p className="underline-text-sm text-gray-500">
               Designed by Allan Wanyonyi
