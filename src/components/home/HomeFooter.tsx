@@ -14,14 +14,14 @@ const HomeFooter = () => {
             <h3 className="text-lg font-semibold">Maryland Senior School</h3>
           </div>
           <p className="text-gray-400 mb-4">
-            Empowering minds, shaping futures - Excellence in education since our establishment
+            School Motto:Education is a compass
           </p>
           <div className="space-y-2">
             <p className="text-sm text-gray-500">
               © 2024 Maryland Senior School. All rights reserved.
             </p>
-            <p className="text-sm text-gray-500">
-              Designed by Allanware
+            <p className="underline-text-sm text-gray-500">
+              Designed by Allan Wanyonyi
             </p>
           </div>
         </div>
