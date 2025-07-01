@@ -8,6 +8,8 @@ import { BookManagement } from './BookManagement';
 import { StudentManagement } from './StudentManagement';
 import { BorrowingManagement } from './BorrowingManagement';
 import { WeeklyReport } from './WeeklyReport';
+import { QuickReturnNavbar } from './QuickReturnNavbar';
+import { calculateFine } from '../utils/libraryData';
 import { 
   BookOpen, 
   Users, 
@@ -18,6 +20,7 @@ import {
   TrendingUp,
   FileText
 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -38,6 +41,42 @@ const AdminDashboard = () => {
     setBooks(booksData);
     setStudents(studentsData);
     setBorrowRecords(recordsData);
+  };
+
+  const handleQuickReturn = (recordId: string) => {
+    const record = borrowRecords.find(r => r.id === recordId);
+    if (!record) return;
+
+    const returnDate = new Date().toISOString();
+    const fine = calculateFine(record.dueDate);
+
+    // Update record
+    const updatedRecords = borrowRecords.map(r => 
+      r.id === recordId 
+        ? {
+            ...r,
+            returnDate,
+            fine,
+            status: 'returned' as const
+          }
+        : r
+    );
+    localStorage.setItem('library_borrow_records', JSON.stringify(updatedRecords));
+
+    // Update book availability
+    const updatedBooks = books.map(b => 
+      b.id === record.bookId 
+        ? { ...b, availableCopies: b.availableCopies + 1 }
+        : b
+    );
+    localStorage.setItem('library_books', JSON.stringify(updatedBooks));
+
+    toast({
+      title: "Success",
+      description: `Book returned successfully${fine > 0 ? ` with KES ${fine} fine` : ''}`
+    });
+
+    loadData();
   };
 
   const totalBooks = books.reduce((sum, book) => sum + book.totalCopies, 0);
@@ -78,6 +117,18 @@ const AdminDashboard = () => {
           </div>
         </div>
       </header>
+
+      {/* Quick Return Navigation Bar - Always visible */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+          <QuickReturnNavbar
+            books={books}
+            students={students}
+            borrowRecords={borrowRecords}
+            onReturnBook={handleQuickReturn}
+          />
+        </div>
+      </div>
 
       {/* Navigation */}
       <nav className="bg-white border-b">
