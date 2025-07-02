@@ -26,7 +26,7 @@ export interface BorrowRecord {
   borrow_date: string;
   return_date: string | null;
   due_date: string;
-  fine: number;
+  fine_amount: number;
   status: 'borrowed' | 'returned' | 'overdue';
   books?: {
     title: string;

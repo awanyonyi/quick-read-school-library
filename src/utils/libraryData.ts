@@ -136,7 +136,7 @@ export const returnBook = async (recordId: string, fine: number = 0) => {
     .update({
       return_date: new Date().toISOString(),
       status: 'returned',
-      fine: fine
+      fine_amount: fine
     })
     .eq('id', recordId)
     .select()

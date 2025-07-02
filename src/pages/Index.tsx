@@ -2,11 +2,9 @@
 import { useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { AuthProvider } from "../contexts/AuthContext";
-import HomePage from "../components/HomePage";
 import AdminDashboard from "../components/AdminDashboard";
 import StudentDashboard from "../components/StudentDashboard";
 import AuthPage from "../components/AuthPage";
-import { toast } from "@/hooks/use-toast";
 
 const AuthWrapper = () => {
   const { user, isLoading } = useAuth();
@@ -39,7 +37,7 @@ const AuthWrapper = () => {
   }
 
   // Fallback - should not reach here normally
-  return <HomePage />;
+  return <AuthPage />;
 };
 
 const Index = () => {

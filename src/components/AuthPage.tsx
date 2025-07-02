@@ -5,41 +5,24 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, Lock, User, Mail, AlertCircle } from 'lucide-react';
+import { BookOpen, Lock, User, AlertCircle, GraduationCap, Shield } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 const AuthPage = () => {
-  const { login, signUp, isLoading } = useAuth();
-  const [loginData, setLoginData] = useState({ email: '', password: '' });
-  const [signUpData, setSignUpData] = useState({ 
-    email: '', 
-    password: '', 
-    confirmPassword: '',
-    name: '', 
-    role: 'student' as 'admin' | 'student',
-    admissionNumber: ''
-  });
+  const { login, isLoading } = useAuth();
+  const [adminData, setAdminData] = useState({ username: '', password: '' });
+  const [studentData, setStudentData] = useState({ name: '', admissionNumber: '' });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const validatePassword = (password: string): boolean => {
-    return password.length >= 8;
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: { [key: string]: string } = {};
 
-    if (!validateEmail(loginData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+    if (!adminData.username.trim()) {
+      newErrors.username = 'Username is required';
     }
-    if (!loginData.password) {
+    if (!adminData.password) {
       newErrors.password = 'Password is required';
     }
 
@@ -49,7 +32,7 @@ const AuthPage = () => {
     }
 
     setErrors({});
-    const result = await login(loginData.email, loginData.password);
+    const result = await login(adminData.username, adminData.password);
     
     if (!result.success) {
       toast({
@@ -60,24 +43,15 @@ const AuthPage = () => {
     }
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleStudentLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: { [key: string]: string } = {};
 
-    if (!validateEmail(signUpData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-    if (!validatePassword(signUpData.password)) {
-      newErrors.password = 'Password must be at least 8 characters long';
-    }
-    if (signUpData.password !== signUpData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-    if (!signUpData.name.trim()) {
+    if (!studentData.name.trim()) {
       newErrors.name = 'Name is required';
     }
-    if (signUpData.role === 'student' && !signUpData.admissionNumber.trim()) {
-      newErrors.admissionNumber = 'Admission number is required for students';
+    if (!studentData.admissionNumber.trim()) {
+      newErrors.admissionNumber = 'Admission number is required';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -86,23 +60,12 @@ const AuthPage = () => {
     }
 
     setErrors({});
-    const result = await signUp(
-      signUpData.email,
-      signUpData.password,
-      signUpData.name,
-      signUpData.role,
-      signUpData.role === 'student' ? signUpData.admissionNumber : undefined
-    );
-
-    if (result.success) {
+    const result = await login(studentData.name, studentData.admissionNumber);
+    
+    if (!result.success) {
       toast({
-        title: "Account Created",
-        description: "Please check your email to verify your account",
-      });
-    } else {
-      toast({
-        title: "Sign Up Failed", 
-        description: result.error || "Failed to create account",
+        title: "Login Failed",
+        description: result.error || "Invalid credentials",
         variant: "destructive"
       });
     }
@@ -119,57 +82,131 @@ const AuthPage = () => {
           <p className="text-gray-600">Library Management System</p>
         </div>
 
-        <Tabs defaultValue="login" className="w-full">
+        <Tabs defaultValue="student" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Login</TabsTrigger>
-            <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            <TabsTrigger value="student">Student Login</TabsTrigger>
+            <TabsTrigger value="admin">Admin Login</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="login">
+          <TabsContent value="student">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Lock className="h-5 w-5" />
-                  Login
+                  <GraduationCap className="h-5 w-5" />
+                  Student Login
                 </CardTitle>
                 <CardDescription>
-                  Enter your credentials to access the library system
+                  Enter your name and admission number to access the library
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleLogin} className="space-y-4">
+                <form onSubmit={handleStudentLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
+                    <Label htmlFor="student-name">Full Name</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="Enter your email"
-                        value={loginData.email}
-                        onChange={(e) => setLoginData({...loginData, email: e.target.value})}
-                        className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}
+                        id="student-name"
+                        type="text"
+                        placeholder="Enter your full name"
+                        value={studentData.name}
+                        onChange={(e) => setStudentData({...studentData, name: e.target.value})}
+                        className={`pl-10 ${errors.name ? 'border-red-500' : ''}`}
                         required
                       />
                     </div>
-                    {errors.email && (
+                    {errors.name && (
                       <div className="flex items-center gap-1 text-red-600 text-sm">
                         <AlertCircle className="h-3 w-3" />
-                        {errors.email}
+                        {errors.name}
                       </div>
                     )}
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
+                    <Label htmlFor="admission-number">Admission Number</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
-                        id="login-password"
+                        id="admission-number"
+                        type="text"
+                        placeholder="Enter your admission number"
+                        value={studentData.admissionNumber}
+                        onChange={(e) => setStudentData({...studentData, admissionNumber: e.target.value})}
+                        className={`pl-10 ${errors.admissionNumber ? 'border-red-500' : ''}`}
+                        required
+                      />
+                    </div>
+                    {errors.admissionNumber && (
+                      <div className="flex items-center gap-1 text-red-600 text-sm">
+                        <AlertCircle className="h-3 w-3" />
+                        {errors.admissionNumber}
+                      </div>
+                    )}
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? 'Signing In...' : 'Sign In'}
+                  </Button>
+                </form>
+
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    <strong>Demo Students:</strong><br />
+                    • John Doe (STD001)<br />
+                    • Jane Smith (STD002)<br />
+                    • Michael Johnson (STD003)
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="admin">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Admin Login
+                </CardTitle>
+                <CardDescription>
+                  Administrator access to the library management system
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleAdminLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="admin-username">Username</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="admin-username"
+                        type="text"
+                        placeholder="Enter admin username"
+                        value={adminData.username}
+                        onChange={(e) => setAdminData({...adminData, username: e.target.value})}
+                        className={`pl-10 ${errors.username ? 'border-red-500' : ''}`}
+                        required
+                      />
+                    </div>
+                    {errors.username && (
+                      <div className="flex items-center gap-1 text-red-600 text-sm">
+                        <AlertCircle className="h-3 w-3" />
+                        {errors.username}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="admin-password">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="admin-password"
                         type="password"
-                        placeholder="Enter your password"
-                        value={loginData.password}
-                        onChange={(e) => setLoginData({...loginData, password: e.target.value})}
+                        placeholder="Enter admin password"
+                        value={adminData.password}
+                        onChange={(e) => setAdminData({...adminData, password: e.target.value})}
                         className={`pl-10 ${errors.password ? 'border-red-500' : ''}`}
                         required
                       />
@@ -186,146 +223,14 @@ const AuthPage = () => {
                     {isLoading ? 'Signing In...' : 'Sign In'}
                   </Button>
                 </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
-          <TabsContent value="signup">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Create Account
-                </CardTitle>
-                <CardDescription>
-                  Register for a new library account
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Full Name</Label>
-                    <Input
-                      id="signup-name"
-                      type="text"
-                      placeholder="Enter your full name"
-                      value={signUpData.name}
-                      onChange={(e) => setSignUpData({...signUpData, name: e.target.value})}
-                      className={errors.name ? 'border-red-500' : ''}
-                      required
-                    />
-                    {errors.name && (
-                      <div className="flex items-center gap-1 text-red-600 text-sm">
-                        <AlertCircle className="h-3 w-3" />
-                        {errors.name}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        placeholder="Enter your email address"
-                        value={signUpData.email}
-                        onChange={(e) => setSignUpData({...signUpData, email: e.target.value})}
-                        className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}
-                        required
-                      />
-                    </div>
-                    {errors.email && (
-                      <div className="flex items-center gap-1 text-red-600 text-sm">
-                        <AlertCircle className="h-3 w-3" />
-                        {errors.email}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-role">Role</Label>
-                    <Select value={signUpData.role} onValueChange={(value: 'admin' | 'student') => setSignUpData({...signUpData, role: value})}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="student">Student</SelectItem>
-                        <SelectItem value="admin">Administrator</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {signUpData.role === 'student' && (
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-admission">Admission Number</Label>
-                      <Input
-                        id="signup-admission"
-                        type="text"
-                        placeholder="Enter your admission number"
-                        value={signUpData.admissionNumber}
-                        onChange={(e) => setSignUpData({...signUpData, admissionNumber: e.target.value})}
-                        className={errors.admissionNumber ? 'border-red-500' : ''}
-                        required
-                      />
-                      {errors.admissionNumber && (
-                        <div className="flex items-center gap-1 text-red-600 text-sm">
-                          <AlertCircle className="h-3 w-3" />
-                          {errors.admissionNumber}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="Create a secure password"
-                        value={signUpData.password}
-                        onChange={(e) => setSignUpData({...signUpData, password: e.target.value})}
-                        className={`pl-10 ${errors.password ? 'border-red-500' : ''}`}
-                        required
-                      />
-                    </div>
-                    {errors.password && (
-                      <div className="flex items-center gap-1 text-red-600 text-sm">
-                        <AlertCircle className="h-3 w-3" />
-                        {errors.password}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-confirm-password">Confirm Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="signup-confirm-password"
-                        type="password"
-                        placeholder="Confirm your password"
-                        value={signUpData.confirmPassword}
-                        onChange={(e) => setSignUpData({...signUpData, confirmPassword: e.target.value})}
-                        className={`pl-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
-                        required
-                      />
-                    </div>
-                    {errors.confirmPassword && (
-                      <div className="flex items-center gap-1 text-red-600 text-sm">
-                        <AlertCircle className="h-3 w-3" />
-                        {errors.confirmPassword}
-                      </div>
-                    )}
-                  </div>
-
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Creating Account...' : 'Create Account'}
-                  </Button>
-                </form>
+                <div className="mt-4 p-3 bg-amber-50 rounded-lg">
+                  <p className="text-sm text-amber-700">
+                    <strong>Demo Admin:</strong><br />
+                    Username: admin<br />
+                    Password: admin123
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
