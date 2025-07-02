@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,15 +48,15 @@ const AdminDashboard = () => {
     const record = borrowRecords.find(r => r.id === recordId);
     if (!record) return;
 
-    const returnDate = new Date().toISOString();
-    const fine = calculateFine(record.dueDate);
+    const return_date = new Date().toISOString();
+    const fine = calculateFine(record.due_date);
 
     // Update record
     const updatedRecords = borrowRecords.map(r => 
       r.id === recordId 
         ? {
             ...r,
-            returnDate,
+            return_date,
             fine,
             status: 'returned' as const
           }
@@ -65,8 +66,8 @@ const AdminDashboard = () => {
 
     // Update book availability
     const updatedBooks = books.map(b => 
-      b.id === record.bookId 
-        ? { ...b, availableCopies: b.availableCopies + 1 }
+      b.id === record.book_id 
+        ? { ...b, available_copies: b.available_copies + 1 }
         : b
     );
     localStorage.setItem('library_books', JSON.stringify(updatedBooks));
@@ -79,12 +80,12 @@ const AdminDashboard = () => {
     loadData();
   };
 
-  const totalBooks = books.reduce((sum, book) => sum + book.totalCopies, 0);
-  const availableBooks = books.reduce((sum, book) => sum + book.availableCopies, 0);
+  const totalBooks = books.reduce((sum, book) => sum + book.total_copies, 0);
+  const availableBooks = books.reduce((sum, book) => sum + book.available_copies, 0);
   const borrowedBooks = totalBooks - availableBooks;
   const overdueBooks = borrowRecords.filter(record => 
     record.status === 'overdue' || 
-    (record.status === 'borrowed' && new Date() > new Date(record.dueDate))
+    (record.status === 'borrowed' && new Date() > new Date(record.due_date))
   ).length;
 
   const tabs = [
@@ -223,8 +224,8 @@ const AdminDashboard = () => {
               <CardContent>
                 <div className="space-y-4">
                   {borrowRecords.slice(-5).reverse().map((record) => {
-                    const book = books.find(b => b.id === record.bookId);
-                    const student = students.find(s => s.id === record.studentId);
+                    const book = books.find(b => b.id === record.book_id);
+                    const student = students.find(s => s.id === record.student_id);
                     return (
                       <div key={record.id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex-1">
@@ -238,7 +239,7 @@ const AdminDashboard = () => {
                             {record.status}
                           </Badge>
                           <p className="text-xs text-gray-500 mt-1">
-                            {new Date(record.borrowDate).toLocaleDateString()}
+                            {new Date(record.borrow_date).toLocaleDateString()}
                           </p>
                         </div>
                       </div>

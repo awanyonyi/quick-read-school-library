@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Book } from '../types';
 import { Plus, Edit, Trash2, BookOpen } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
@@ -36,9 +37,11 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
   const [formData, setFormData] = useState({
     title: '',
     author: '',
-    category: '',
-    totalCopies: 1
+    category: '' as Book['category'] | '',
+    total_copies: 1
   });
+
+  const categories = ['Science', 'Language', 'Technicals and Applied', 'Humanities', 'Maths'] as const;
 
   useEffect(() => {
     loadBooks();
@@ -70,7 +73,7 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
           ? {
               ...book,
               ...formData,
-              availableCopies: book.availableCopies + (formData.totalCopies - book.totalCopies)
+              available_copies: book.available_copies + (formData.total_copies - book.total_copies)
             }
           : book
       );
@@ -83,17 +86,17 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
       // Add new books - create individual entries for each copy
       const newBooks: Book[] = [];
       
-      for (let i = 0; i < formData.totalCopies; i++) {
+      for (let i = 0; i < formData.total_copies; i++) {
         const uniqueISBN = generateUniqueISBN([...booksData, ...newBooks]);
         const newBook: Book = {
           id: `${Date.now()}_${i}`,
           title: formData.title,
           author: formData.author,
           isbn: uniqueISBN,
-          category: formData.category,
-          totalCopies: 1, // Each book is now a single copy with unique ISBN
-          availableCopies: 1,
-          addedDate: new Date().toISOString()
+          category: formData.category as Book['category'],
+          total_copies: 1, // Each book is now a single copy with unique ISBN
+          available_copies: 1,
+          created_at: new Date().toISOString()
         };
         newBooks.push(newBook);
       }
@@ -103,7 +106,7 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
       
       toast({
         title: "Success",
-        description: `${formData.totalCopies} book${formData.totalCopies > 1 ? 's' : ''} added successfully with unique ISBNs`
+        description: `${formData.total_copies} book${formData.total_copies > 1 ? 's' : ''} added successfully with unique ISBNs`
       });
     }
     
@@ -131,7 +134,7 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
       title: '',
       author: '',
       category: '',
-      totalCopies: 1
+      total_copies: 1
     });
     setEditingBook(null);
     setIsAddDialogOpen(false);
@@ -143,7 +146,7 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
       title: book.title,
       author: book.author,
       category: book.category,
-      totalCopies: book.totalCopies
+      total_copies: book.total_copies
     });
     setIsAddDialogOpen(true);
   };
@@ -203,13 +206,18 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="category">Category *</Label>
-                  <Input
-                    id="category"
-                    value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
-                    placeholder="Enter category"
-                    required
-                  />
+                  <Select value={formData.category} onValueChange={(value: Book['category']) => setFormData({...formData, category: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="copies">Number of Copies</Label>
@@ -217,8 +225,8 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
                     id="copies"
                     type="number"
                     min="1"
-                    value={formData.totalCopies}
-                    onChange={(e) => setFormData({...formData, totalCopies: parseInt(e.target.value)})}
+                    value={formData.total_copies}
+                    onChange={(e) => setFormData({...formData, total_copies: parseInt(e.target.value)})}
                     required
                   />
                   <p className="text-xs text-gray-500">Each copy will get a unique ISBN</p>
@@ -247,7 +255,7 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
             {Object.entries(groupedBooks).map(([key, bookGroup]) => {
               const firstBook = bookGroup[0];
               const totalCopies = bookGroup.length;
-              const availableCopies = bookGroup.filter(book => book.availableCopies > 0).length;
+              const availableCopies = bookGroup.filter(book => book.available_copies > 0).length;
               
               return (
                 <div key={key} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -283,9 +291,9 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
                           <div className="flex-1">
                             <span className="text-sm font-mono">ISBN: {book.isbn}</span>
                             <span className={`ml-4 text-xs px-2 py-1 rounded ${
-                              book.availableCopies > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                              book.available_copies > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                             }`}>
-                              {book.availableCopies > 0 ? 'Available' : 'Borrowed'}
+                              {book.available_copies > 0 ? 'Available' : 'Borrowed'}
                             </span>
                           </div>
                           <div className="flex space-x-1">

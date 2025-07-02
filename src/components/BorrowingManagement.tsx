@@ -39,7 +39,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
     setBorrowRecords(recordsData);
   };
 
-  const availableBooks = books.filter(book => book.availableCopies > 0);
+  const availableBooks = books.filter(book => book.available_copies > 0);
 
   // Filter books based on search query
   const filteredBooks = useMemo(() => {
@@ -59,7 +59,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
     }
     return students.filter(student =>
       student.name.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
-      student.admissionNumber.toLowerCase().includes(studentSearchQuery.toLowerCase())
+      student.admission_number.toLowerCase().includes(studentSearchQuery.toLowerCase())
     );
   }, [students, studentSearchQuery]);
 
@@ -74,7 +74,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
     }
 
     const book = books.find(b => b.id === selectedBookId);
-    if (!book || book.availableCopies <= 0) {
+    if (!book || book.available_copies <= 0) {
       toast({
         title: "Error",
         description: "Book is not available for borrowing",
@@ -85,8 +85,8 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
 
     // Check if student already has this book
     const existingRecord = borrowRecords.find(record => 
-      record.bookId === selectedBookId && 
-      record.studentId === selectedStudentId && 
+      record.book_id === selectedBookId && 
+      record.student_id === selectedStudentId && 
       record.status === 'borrowed'
     );
 
@@ -99,17 +99,17 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
       return;
     }
 
-    const borrowDate = new Date().toISOString();
-    const dueDate = getBorrowDueDate(borrowDate);
+    const borrow_date = new Date().toISOString();
+    const due_date = getBorrowDueDate(borrow_date);
 
     // Create borrow record
     const newRecord: BorrowRecord = {
       id: Date.now().toString(),
-      bookId: selectedBookId,
-      studentId: selectedStudentId,
-      borrowDate,
-      returnDate: null,
-      dueDate,
+      book_id: selectedBookId,
+      student_id: selectedStudentId,
+      borrow_date,
+      return_date: null,
+      due_date,
       fine: 0,
       status: 'borrowed'
     };
@@ -121,7 +121,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
     // Update book availability
     const updatedBooks = books.map(b => 
       b.id === selectedBookId 
-        ? { ...b, availableCopies: b.availableCopies - 1 }
+        ? { ...b, available_copies: b.available_copies - 1 }
         : b
     );
     localStorage.setItem('library_books', JSON.stringify(updatedBooks));
@@ -144,15 +144,15 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
     const record = borrowRecords.find(r => r.id === recordId);
     if (!record) return;
 
-    const returnDate = new Date().toISOString();
-    const fine = calculateFine(record.dueDate);
+    const return_date = new Date().toISOString();
+    const fine = calculateFine(record.due_date);
 
     // Update record
     const updatedRecords = borrowRecords.map(r => 
       r.id === recordId 
         ? {
             ...r,
-            returnDate,
+            return_date,
             fine,
             status: 'returned' as const
           }
@@ -162,8 +162,8 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
 
     // Update book availability
     const updatedBooks = books.map(b => 
-      b.id === record.bookId 
-        ? { ...b, availableCopies: b.availableCopies + 1 }
+      b.id === record.book_id 
+        ? { ...b, available_copies: b.available_copies + 1 }
         : b
     );
     localStorage.setItem('library_books', JSON.stringify(updatedBooks));
@@ -178,7 +178,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
   };
 
   const activeBorrowRecords = borrowRecords.filter(record => record.status === 'borrowed');
-  const overdueRecords = activeBorrowRecords.filter(record => new Date() > new Date(record.dueDate));
+  const overdueRecords = activeBorrowRecords.filter(record => new Date() > new Date(record.due_date));
 
   return (
     <div className="space-y-6">
@@ -228,7 +228,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                               by {book.author} • ISBN: {book.isbn || 'N/A'}
                             </span>
                             <span className="text-sm text-gray-500">
-                              Available: {book.availableCopies}
+                              Available: {book.available_copies}
                             </span>
                           </div>
                         </SelectItem>
@@ -265,7 +265,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                           <div className="flex flex-col">
                             <span className="font-medium">{student.name}</span>
                             <span className="text-sm text-gray-500">
-                              {student.admissionNumber} • {student.class}
+                              {student.admission_number} • {student.class}
                             </span>
                           </div>
                         </SelectItem>
@@ -333,10 +333,10 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
         <CardContent>
           <div className="space-y-4">
             {activeBorrowRecords.map((record) => {
-              const book = books.find(b => b.id === record.bookId);
-              const student = students.find(s => s.id === record.studentId);
-              const isOverdue = new Date() > new Date(record.dueDate);
-              const fine = isOverdue ? calculateFine(record.dueDate) : 0;
+              const book = books.find(b => b.id === record.book_id);
+              const student = students.find(s => s.id === record.student_id);
+              const isOverdue = new Date() > new Date(record.due_date);
+              const fine = isOverdue ? calculateFine(record.due_date) : 0;
 
               return (
                 <div key={record.id} className="border rounded-lg p-4">
@@ -353,14 +353,14 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                           <div className="flex items-center space-x-2 mt-2">
                             <User className="h-4 w-4 text-gray-400" />
                             <span className="text-sm">{student?.name || 'Unknown Student'}</span>
-                            <span className="text-sm text-gray-500">({student?.admissionNumber})</span>
+                            <span className="text-sm text-gray-500">({student?.admission_number})</span>
                           </div>
                           <div className="flex items-center space-x-4 mt-2">
                             <span className="text-sm">
-                              Borrowed: {new Date(record.borrowDate).toLocaleDateString()}
+                              Borrowed: {new Date(record.borrow_date).toLocaleDateString()}
                             </span>
                             <span className="text-sm">
-                              Due: {new Date(record.dueDate).toLocaleString()}
+                              Due: {new Date(record.due_date).toLocaleString()}
                             </span>
                           </div>
                           {fine > 0 && (
@@ -411,8 +411,8 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
               .slice(-5)
               .reverse()
               .map((record) => {
-                const book = books.find(b => b.id === record.bookId);
-                const student = students.find(s => s.id === record.studentId);
+                const book = books.find(b => b.id === record.book_id);
+                const student = students.find(s => s.id === record.student_id);
 
                 return (
                   <div key={record.id} className="border rounded-lg p-4">
@@ -432,7 +432,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                             </div>
                             <div className="flex items-center space-x-4 mt-2">
                               <span className="text-sm">
-                                Returned: {record.returnDate ? new Date(record.returnDate).toLocaleDateString() : 'N/A'}
+                                Returned: {record.return_date ? new Date(record.return_date).toLocaleDateString() : 'N/A'}
                               </span>
                               {record.fine > 0 && (
                                 <span className="text-sm text-red-600">

@@ -33,14 +33,14 @@ export const QuickReturnNavbar: React.FC<QuickReturnNavbarProps> = ({
 
     // Filter by status
     if (statusFilter === 'overdue') {
-      filtered = filtered.filter(record => new Date() > new Date(record.dueDate));
+      filtered = filtered.filter(record => new Date() > new Date(record.due_date));
     }
 
     // Filter by search query
     if (searchQuery.trim()) {
       filtered = filtered.filter(record => {
-        const book = books.find(b => b.id === record.bookId);
-        const student = students.find(s => s.id === record.studentId);
+        const book = books.find(b => b.id === record.book_id);
+        const student = students.find(s => s.id === record.student_id);
         
         const searchTerm = searchQuery.toLowerCase();
         return (
@@ -48,7 +48,7 @@ export const QuickReturnNavbar: React.FC<QuickReturnNavbarProps> = ({
           book?.author.toLowerCase().includes(searchTerm) ||
           book?.isbn?.toLowerCase().includes(searchTerm) ||
           student?.name.toLowerCase().includes(searchTerm) ||
-          student?.admissionNumber.toLowerCase().includes(searchTerm)
+          student?.admission_number.toLowerCase().includes(searchTerm)
         );
       });
     }
@@ -57,7 +57,7 @@ export const QuickReturnNavbar: React.FC<QuickReturnNavbarProps> = ({
   }, [activeBorrowRecords, statusFilter, searchQuery, books, students]);
 
   const overdueCount = activeBorrowRecords.filter(record => 
-    new Date() > new Date(record.dueDate)
+    new Date() > new Date(record.due_date)
   ).length;
 
   const clearFilters = () => {
@@ -134,10 +134,10 @@ export const QuickReturnNavbar: React.FC<QuickReturnNavbarProps> = ({
             <h3 className="text-sm font-medium text-gray-900 mb-3">Quick Return Actions</h3>
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {filteredRecords.map((record) => {
-                const book = books.find(b => b.id === record.bookId);
-                const student = students.find(s => s.id === record.studentId);
-                const isOverdue = new Date() > new Date(record.dueDate);
-                const fine = isOverdue ? calculateFine(record.dueDate) : 0;
+                const book = books.find(b => b.id === record.book_id);
+                const student = students.find(s => s.id === record.student_id);
+                const isOverdue = new Date() > new Date(record.due_date);
+                const fine = isOverdue ? calculateFine(record.due_date) : 0;
 
                 return (
                   <div
@@ -166,10 +166,10 @@ export const QuickReturnNavbar: React.FC<QuickReturnNavbarProps> = ({
                           </div>
                           <div className="flex items-center space-x-4 mt-1">
                             <p className="text-xs text-gray-600">
-                              Student: {student?.name || 'Unknown'} ({student?.admissionNumber})
+                              Student: {student?.name || 'Unknown'} ({student?.admission_number})
                             </p>
                             <p className="text-xs text-gray-500">
-                              Due: {new Date(record.dueDate).toLocaleDateString()}
+                              Due: {new Date(record.due_date).toLocaleDateString()}
                             </p>
                             {fine > 0 && (
                               <span className="text-xs text-red-600 font-medium">

@@ -33,7 +33,7 @@ const StudentDashboard = () => {
     const recordsData = JSON.parse(localStorage.getItem('library_borrow_records') || '[]');
     
     setBooks(booksData);
-    setBorrowRecords(recordsData.filter((record: BorrowRecord) => record.studentId === user?.id));
+    setBorrowRecords(recordsData.filter((record: BorrowRecord) => record.student_id === user?.id));
   };
 
   const categories = ['all', ...new Set(books.map(book => book.category))];
@@ -48,12 +48,12 @@ const StudentDashboard = () => {
   const myBorrowedBooks = borrowRecords.filter(record => record.status === 'borrowed');
   const myOverdueBooks = borrowRecords.filter(record => {
     if (record.status !== 'borrowed') return false;
-    return new Date() > new Date(record.dueDate);
+    return new Date() > new Date(record.due_date);
   });
 
   const totalFines = borrowRecords.reduce((sum, record) => {
-    if (record.status === 'borrowed' && new Date() > new Date(record.dueDate)) {
-      return sum + calculateFine(record.dueDate);
+    if (record.status === 'borrowed' && new Date() > new Date(record.due_date)) {
+      return sum + calculateFine(record.due_date);
     }
     return sum + record.fine;
   }, 0);
@@ -132,9 +132,9 @@ const StudentDashboard = () => {
                         </div>
                         <div className="text-right">
                           <div className="flex items-center space-x-2">
-                            {book.availableCopies > 0 ? (
+                            {book.available_copies > 0 ? (
                               <Badge variant="default" className="bg-green-100 text-green-800">
-                                Available ({book.availableCopies})
+                                Available ({book.available_copies})
                               </Badge>
                             ) : (
                               <Badge variant="destructive">
@@ -143,7 +143,7 @@ const StudentDashboard = () => {
                             )}
                           </div>
                           <p className="text-xs text-gray-500 mt-1">
-                            Total: {book.totalCopies} copies
+                            Total: {book.total_copies} copies
                           </p>
                         </div>
                       </div>
@@ -206,9 +206,9 @@ const StudentDashboard = () => {
               <CardContent>
                 <div className="space-y-3">
                   {borrowRecords.slice(-5).reverse().map((record) => {
-                    const book = books.find(b => b.id === record.bookId);
-                    const isOverdue = record.status === 'borrowed' && new Date() > new Date(record.dueDate);
-                    const fine = isOverdue ? calculateFine(record.dueDate) : record.fine;
+                    const book = books.find(b => b.id === record.book_id);
+                    const isOverdue = record.status === 'borrowed' && new Date() > new Date(record.due_date);
+                    const fine = isOverdue ? calculateFine(record.due_date) : record.fine;
                     
                     return (
                       <div key={record.id} className="border rounded-lg p-3">
@@ -216,11 +216,11 @@ const StudentDashboard = () => {
                           <div className="flex-1">
                             <h4 className="font-medium text-sm">{book?.title || 'Unknown Book'}</h4>
                             <p className="text-xs text-gray-500">
-                              Borrowed: {new Date(record.borrowDate).toLocaleDateString()}
+                              Borrowed: {new Date(record.borrow_date).toLocaleDateString()}
                             </p>
                             {record.status === 'borrowed' && (
                               <p className="text-xs text-gray-500">
-                                Due: {new Date(record.dueDate).toLocaleString()}
+                                Due: {new Date(record.due_date).toLocaleString()}
                               </p>
                             )}
                           </div>
