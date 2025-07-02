@@ -149,15 +149,6 @@ const AuthPage = () => {
                     {isLoading ? 'Signing In...' : 'Sign In'}
                   </Button>
                 </form>
-
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-700">
-                    <strong>Demo Students:</strong><br />
-                    • John Doe (STD001)<br />
-                    • Jane Smith (STD002)<br />
-                    • Michael Johnson (STD003)
-                  </p>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -223,14 +214,6 @@ const AuthPage = () => {
                     {isLoading ? 'Signing In...' : 'Sign In'}
                   </Button>
                 </form>
-
-                <div className="mt-4 p-3 bg-amber-50 rounded-lg">
-                  <p className="text-sm text-amber-700">
-                    <strong>Demo Admin:</strong><br />
-                    Username: admin<br />
-                    Password: admin123
-                  </p>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>

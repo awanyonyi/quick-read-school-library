@@ -50,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
-      // First try admin login
+      // First try admin login with new credentials
       const { data: adminData, error: adminError } = await supabase
         .from('admins')
         .select('*')
@@ -58,9 +58,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (adminData && !adminError) {
-        // For demo purposes, we'll use simple password comparison
-        // In production, you should use proper password hashing
-        if (password === 'admin123') {
+        // Check for new admin credentials
+        if (username === 'Maryland@library' && password === 'Maryland_lib2025') {
           const userProfile: UserProfile = {
             id: adminData.id,
             name: adminData.name,
