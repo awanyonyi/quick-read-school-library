@@ -1,24 +1,24 @@
 
-import React, { useEffect, useState } from 'react';
-import { AuthProvider, useAuth } from '../contexts/AuthContext';
-import { initializeDefaultData } from '../utils/libraryData';
-import LoginForm from '../components/LoginForm';
-import AdminDashboard from '../components/AdminDashboard';
-import StudentDashboard from '../components/StudentDashboard';
-import HomePage from '../components/HomePage';
+import { useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { AuthProvider } from "../contexts/AuthContext";
+import HomePage from "../components/HomePage";
+import AdminDashboard from "../components/AdminDashboard";
+import StudentDashboard from "../components/StudentDashboard";
+import AuthPage from "../components/AuthPage";
+import { toast } from "@/hooks/use-toast";
 
-const MainApp = () => {
+const AuthWrapper = () => {
   const { user, isLoading } = useAuth();
-  const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
-    // Initialize default data on app startup
-    initializeDefaultData();
-  }, []);
+    // Initialize any required data or perform setup
+    console.log("Auth state:", { user, isLoading });
+  }, [user, isLoading]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-green-50">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
@@ -27,23 +27,25 @@ const MainApp = () => {
     );
   }
 
-  // If user is logged in, show appropriate dashboard
-  if (user) {
-    return user.role === 'admin' ? <AdminDashboard /> : <StudentDashboard />;
+  if (!user) {
+    return <AuthPage />;
   }
 
-  // If no user is logged in, show either home page or login form
-  if (showLogin) {
-    return <LoginForm onBackToHome={() => setShowLogin(false)} />;
+  // Route to appropriate dashboard based on user role
+  if (user.role === 'admin') {
+    return <AdminDashboard />;
+  } else if (user.role === 'student') {
+    return <StudentDashboard />;
   }
 
-  return <HomePage onShowLogin={() => setShowLogin(true)} />;
+  // Fallback - should not reach here normally
+  return <HomePage />;
 };
 
 const Index = () => {
   return (
     <AuthProvider>
-      <MainApp />
+      <AuthWrapper />
     </AuthProvider>
   );
 };

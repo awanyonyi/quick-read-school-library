@@ -4,28 +4,47 @@ export interface Book {
   title: string;
   author: string;
   isbn: string;
-  category: string;
-  totalCopies: number;
-  availableCopies: number;
-  addedDate: string;
+  category: 'Science' | 'Language' | 'Technicals and Applied' | 'Humanities' | 'Maths';
+  total_copies: number;
+  available_copies: number;
+  created_at: string;
 }
 
 export interface Student {
   id: string;
   name: string;
-  admissionNumber: string;
+  admission_number: string;
   email: string;
   class: string;
-  registeredDate: string;
+  created_at: string;
 }
 
 export interface BorrowRecord {
   id: string;
-  bookId: string;
-  studentId: string;
-  borrowDate: string;
-  returnDate: string | null;
-  dueDate: string;
+  book_id: string;
+  student_id: string;
+  borrow_date: string;
+  return_date: string | null;
+  due_date: string;
   fine: number;
   status: 'borrowed' | 'returned' | 'overdue';
+  books?: {
+    title: string;
+    author: string;
+    isbn: string;
+  };
+  students?: {
+    name: string;
+    admission_number: string;
+    class: string;
+  };
+}
+
+export interface Profile {
+  id: string;
+  name: string;
+  role: 'admin' | 'student';
+  admission_number?: string;
+  email: string;
+  created_at: string;
 }

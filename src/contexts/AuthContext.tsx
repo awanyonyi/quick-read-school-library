@@ -1,17 +1,23 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { User, Session } from '@supabase/supabase-js';
+import { toast } from '@/hooks/use-toast';
 
-export interface User {
+export interface UserProfile {
   id: string;
   name: string;
   role: 'admin' | 'student';
   admissionNumber?: string;
+  email: string;
 }
 
 interface AuthContextType {
-  user: User | null;
-  login: (username: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  user: UserProfile | null;
+  session: Session | null;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
+  signUp: (email: string, password: string, name: string, role: 'admin' | 'student', admissionNumber?: string) => Promise<{ success: boolean; error?: string }>;
   isLoading: boolean;
 }
 
@@ -25,83 +31,127 @@ export const useAuth = () => {
   return context;
 };
 
-// Simple encryption function for password hashing
-const hashPassword = (password: string): string => {
-  let hash = 0;
-  for (let i = 0; i < password.length; i++) {
-    const char = password.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return hash.toString(16);
-};
-
-// Admin credentials with encrypted password
-const ADMIN_USERNAME = 'Maryland@library';
-const ADMIN_PASSWORD_HASH = hashPassword('Maryland_lib2025');
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for saved user session
-    const savedUser = localStorage.getItem('library_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
+        setSession(session);
+        
+        if (session?.user) {
+          // Fetch user profile from database
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (profile && !error) {
+            setUser({
+              id: profile.id,
+              name: profile.name,
+              role: profile.role,
+              admissionNumber: profile.admission_number,
+              email: session.user.email || ''
+            });
+          } else {
+            console.error('Error fetching profile:', error);
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+        setIsLoading(false);
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        // The onAuthStateChange will handle setting the user
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Check for admin credentials with encrypted password
-    if (username === ADMIN_USERNAME && hashPassword(password) === ADMIN_PASSWORD_HASH) {
-      const adminUser: User = {
-        id: 'admin_1',
-        name: 'Library Administrator',
-        role: 'admin'
-      };
-      setUser(adminUser);
-      localStorage.setItem('library_user', JSON.stringify(adminUser));
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'An unexpected error occurred' };
+    } finally {
       setIsLoading(false);
-      return true;
     }
-    
-    // Check for student credentials (username as name, password as admission number)
-    const students = JSON.parse(localStorage.getItem('library_students') || '[]');
-    const student = students.find((s: any) => 
-      s.name.toLowerCase() === username.toLowerCase() && s.admissionNumber === password
-    );
-    
-    if (student) {
-      const studentUser: User = {
-        id: student.id,
-        name: student.name,
-        role: 'student',
-        admissionNumber: student.admissionNumber
-      };
-      setUser(studentUser);
-      localStorage.setItem('library_user', JSON.stringify(studentUser));
-      setIsLoading(false);
-      return true;
-    }
-    
-    setIsLoading(false);
-    return false;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('library_user');
+  const signUp = async (
+    email: string, 
+    password: string, 
+    name: string, 
+    role: 'admin' | 'student', 
+    admissionNumber?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setIsLoading(true);
+      
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            name,
+            role,
+            admission_number: admissionNumber,
+          }
+        }
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'An unexpected error occurred' };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to logout",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, session, login, logout, signUp, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
