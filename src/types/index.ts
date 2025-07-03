@@ -13,10 +13,13 @@ export interface Book {
 export interface Student {
   id: string;
   name: string;
-  admission_number: string;
+  admission_number?: string;
   email: string;
   class: string;
-  created_at: string;
+  created_at?: string;
+  // Legacy properties for backward compatibility
+  admissionNumber?: string;
+  registeredDate?: string;
 }
 
 export interface BorrowRecord {
@@ -26,7 +29,7 @@ export interface BorrowRecord {
   borrow_date: string;
   return_date: string | null;
   due_date: string;
-  fine_amount: number;
+  fine_amount?: number;
   status: 'borrowed' | 'returned' | 'overdue';
   books?: {
     title: string;
@@ -38,6 +41,12 @@ export interface BorrowRecord {
     admission_number: string;
     class: string;
   };
+  // Legacy properties for backward compatibility
+  fine?: number;
+  borrowDate?: string;
+  returnDate?: string | null;
+  bookId?: string;
+  studentId?: string;
 }
 
 export interface Profile {

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, Lock, User, AlertCircle, GraduationCap, Shield } from 'lucide-react';
+import { BookOpen, Lock, User, AlertCircle, GraduationCap, Shield, Eye, EyeOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 const AuthPage = () => {
@@ -14,6 +14,8 @@ const AuthPage = () => {
   const [adminData, setAdminData] = useState({ username: '', password: '' });
   const [studentData, setStudentData] = useState({ name: '', admissionNumber: '' });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [showStudentPassword, setShowStudentPassword] = useState(false);
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,13 +131,20 @@ const AuthPage = () => {
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="admission-number"
-                        type="text"
+                        type={showStudentPassword ? "text" : "password"}
                         placeholder="Enter your admission number"
                         value={studentData.admissionNumber}
                         onChange={(e) => setStudentData({...studentData, admissionNumber: e.target.value})}
-                        className={`pl-10 ${errors.admissionNumber ? 'border-red-500' : ''}`}
+                        className={`pl-10 pr-10 ${errors.admissionNumber ? 'border-red-500' : ''}`}
                         required
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowStudentPassword(!showStudentPassword)}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      >
+                        {showStudentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
                     {errors.admissionNumber && (
                       <div className="flex items-center gap-1 text-red-600 text-sm">
@@ -194,13 +203,20 @@ const AuthPage = () => {
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="admin-password"
-                        type="password"
+                        type={showAdminPassword ? "text" : "password"}
                         placeholder="Enter admin password"
                         value={adminData.password}
                         onChange={(e) => setAdminData({...adminData, password: e.target.value})}
-                        className={`pl-10 ${errors.password ? 'border-red-500' : ''}`}
+                        className={`pl-10 pr-10 ${errors.password ? 'border-red-500' : ''}`}
                         required
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowAdminPassword(!showAdminPassword)}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      >
+                        {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
                     {errors.password && (
                       <div className="flex items-center gap-1 text-red-600 text-sm">

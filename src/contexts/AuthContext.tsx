@@ -50,28 +50,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
-      // First try admin login with new credentials
-      const { data: adminData, error: adminError } = await supabase
-        .from('admins')
-        .select('*')
-        .eq('username', username)
-        .single();
-
-      if (adminData && !adminError) {
-        // Check for new admin credentials
-        if (username === 'Maryland@library' && password === 'Maryland_lib2025') {
-          const userProfile: UserProfile = {
-            id: adminData.id,
-            name: adminData.name,
-            role: 'admin',
-            email: undefined
-          };
-          setUser(userProfile);
-          localStorage.setItem('library_user', JSON.stringify(userProfile));
-          return { success: true };
-        } else {
-          return { success: false, error: 'Invalid credentials' };
-        }
+      // Check for hardcoded admin credentials first
+      if (username === 'Maryland@library' && password === 'Maryland_lib2025') {
+        const userProfile: UserProfile = {
+          id: 'admin-1',
+          name: 'Library Administrator',
+          role: 'admin',
+          email: undefined
+        };
+        setUser(userProfile);
+        localStorage.setItem('library_user', JSON.stringify(userProfile));
+        return { success: true };
       }
 
       // If not admin, try student login (name + admission number)
