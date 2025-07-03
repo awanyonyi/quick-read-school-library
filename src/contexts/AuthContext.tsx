@@ -64,6 +64,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // If not admin, try student login (name + admission number)
+      console.log('Attempting student login with:', { username, password });
+      
       const { data: studentData, error: studentError } = await supabase
         .from('students')
         .select('*')
@@ -71,7 +73,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('admission_number', password)
         .maybeSingle();
 
-      if (studentData && !studentError) {
+      console.log('Student query result:', { studentData, studentError });
+
+      if (studentError) {
+        console.error('Student query error:', studentError);
+        return { success: false, error: 'Database error occurred' };
+      }
+
+      if (studentData) {
         const userProfile: UserProfile = {
           id: studentData.id,
           name: studentData.name,
