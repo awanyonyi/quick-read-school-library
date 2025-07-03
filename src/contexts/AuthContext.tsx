@@ -69,7 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select('*')
         .eq('name', username)
         .eq('admission_number', password)
-        .single();
+        .maybeSingle();
 
       if (studentData && !studentError) {
         const userProfile: UserProfile = {
