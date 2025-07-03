@@ -8,6 +8,7 @@ import { Student } from '../types';
 import { Upload, Download, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StudentExcelUploadProps {
   onUploadComplete: () => void;
@@ -73,8 +74,23 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
         return;
       }
 
-      const existingStudents = JSON.parse(localStorage.getItem('library_students') || '[]');
-      const newStudents: Student[] = [];
+      // Get existing students from database
+      const { data: existingStudents, error: fetchError } = await supabase
+        .from('students')
+        .select('admission_number');
+
+      if (fetchError) {
+        console.error('Error fetching existing students:', fetchError);
+        toast({
+          title: "Database Error",
+          description: "Failed to check existing students",
+          variant: "destructive"
+        });
+        setIsUploading(false);
+        return;
+      }
+
+      const newStudents: any[] = [];
       const errors: string[] = [];
       let successCount = 0;
 
@@ -108,8 +124,8 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
         }
 
         // Check for duplicate admission numbers in existing data
-        const existingStudent = existingStudents.find((student: Student) => 
-          student.admissionNumber === String(admissionNumber).trim()
+        const existingStudent = existingStudents?.find((student: any) => 
+          student.admission_number === String(admissionNumber).trim()
         );
         
         if (existingStudent) {
@@ -120,7 +136,7 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
 
         // Check for duplicate admission numbers in current upload
         const duplicateInUpload = newStudents.find(student => 
-          student.admissionNumber === String(admissionNumber).trim()
+          student.admission_number === String(admissionNumber).trim()
         );
         
         if (duplicateInUpload) {
@@ -131,14 +147,12 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
 
         // Create new student with generated email
         const cleanAdmissionNumber = String(admissionNumber).trim();
-        const generatedEmail = `${cleanAdmissionNumber.toLowerCase()}@school.edu`;
-        const newStudent: Student = {
-          id: `std_${Date.now()}_${index}`,
+        const generatedEmail = `${cleanAdmissionNumber.toLowerCase()}@marylandsenior.edu`;
+        const newStudent = {
           name: String(name).trim(),
-          admissionNumber: cleanAdmissionNumber,
+          admission_number: cleanAdmissionNumber,
           email: generatedEmail,
-          class: String(studentClass).trim(),
-          registeredDate: new Date().toISOString()
+          class: String(studentClass).trim()
         };
 
         console.log(`Row ${rowNumber} created student:`, newStudent);
@@ -148,11 +162,24 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
 
       console.log('Upload results:', { successCount, errorCount: errors.length, newStudents });
 
-      // Save successful entries
+      // Save successful entries to Supabase
       if (newStudents.length > 0) {
-        const updatedStudents = [...existingStudents, ...newStudents];
-        localStorage.setItem('library_students', JSON.stringify(updatedStudents));
-        console.log('Saved students to localStorage:', updatedStudents.length, 'total students');
+        const { data, error: insertError } = await supabase
+          .from('students')
+          .insert(newStudents);
+
+        if (insertError) {
+          console.error('Error inserting students:', insertError);
+          toast({
+            title: "Database Error",
+            description: "Failed to save students to database",
+            variant: "destructive"
+          });
+          setIsUploading(false);
+          return;
+        }
+
+        console.log('Successfully saved students to database:', data);
       }
 
       setUploadResults({

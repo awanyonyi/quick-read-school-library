@@ -9,6 +9,8 @@ import { Student } from '../types';
 import { Plus, Edit, Trash2, User, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { StudentExcelUpload } from './StudentExcelUpload';
+import { supabase } from '@/integrations/supabase/client';
+import { fetchStudents, addStudent } from '@/utils/libraryData';
 
 interface StudentManagementProps {
   onUpdate: () => void;
@@ -21,7 +23,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
   const [showExcelUpload, setShowExcelUpload] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    admissionNumber: '',
+    admission_number: '',
     email: '',
     class: ''
   });
@@ -30,15 +32,24 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
     loadStudents();
   }, []);
 
-  const loadStudents = () => {
-    const studentsData = JSON.parse(localStorage.getItem('library_students') || '[]');
-    setStudents(studentsData);
+  const loadStudents = async () => {
+    try {
+      const studentsData = await fetchStudents();
+      setStudents(studentsData);
+    } catch (error) {
+      console.error('Error loading students:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load students",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.admissionNumber || !formData.email || !formData.class) {
+    if (!formData.name || !formData.admission_number || !formData.email || !formData.class) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -47,73 +58,83 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
       return;
     }
 
-    const studentsData = JSON.parse(localStorage.getItem('library_students') || '[]');
-    
-    // Check for duplicate admission number
-    const existingStudent = studentsData.find((student: Student) => 
-      student.admissionNumber === formData.admissionNumber && 
-      (!editingStudent || student.id !== editingStudent.id)
-    );
-    
-    if (existingStudent) {
+    try {
+      if (editingStudent) {
+        // Update existing student
+        const { error } = await supabase
+          .from('students')
+          .update({
+            name: formData.name,
+            admission_number: formData.admission_number,
+            email: formData.email,
+            class: formData.class
+          })
+          .eq('id', editingStudent.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Student updated successfully"
+        });
+      } else {
+        // Add new student
+        await addStudent({
+          name: formData.name,
+          admission_number: formData.admission_number,
+          email: formData.email,
+          class: formData.class
+        });
+
+        toast({
+          title: "Success",
+          description: "Student added successfully"
+        });
+      }
+      
+      resetForm();
+      loadStudents();
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error saving student:', error);
       toast({
         title: "Error",
-        description: "Admission number already exists",
+        description: error.message || "Failed to save student",
         variant: "destructive"
       });
-      return;
     }
-    
-    if (editingStudent) {
-      // Update existing student
-      const updatedStudents = studentsData.map((student: Student) => 
-        student.id === editingStudent.id 
-          ? { ...student, ...formData }
-          : student
-      );
-      localStorage.setItem('library_students', JSON.stringify(updatedStudents));
-      toast({
-        title: "Success",
-        description: "Student updated successfully"
-      });
-    } else {
-      // Add new student
-      const newStudent: Student = {
-        id: `std_${Date.now()}`,
-        ...formData,
-        registeredDate: new Date().toISOString()
-      };
-      studentsData.push(newStudent);
-      localStorage.setItem('library_students', JSON.stringify(studentsData));
-      toast({
-        title: "Success",
-        description: "Student added successfully"
-      });
-    }
-    
-    resetForm();
-    loadStudents();
-    onUpdate();
   };
 
-  const handleDelete = (studentId: string) => {
-    const studentsData = JSON.parse(localStorage.getItem('library_students') || '[]');
-    const updatedStudents = studentsData.filter((student: Student) => student.id !== studentId);
-    localStorage.setItem('library_students', JSON.stringify(updatedStudents));
-    
-    toast({
-      title: "Success",
-      description: "Student deleted successfully"
-    });
-    
-    loadStudents();
-    onUpdate();
+  const handleDelete = async (studentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('students')
+        .delete()
+        .eq('id', studentId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Student deleted successfully"
+      });
+      
+      loadStudents();
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error deleting student:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete student",
+        variant: "destructive"
+      });
+    }
   };
 
   const resetForm = () => {
     setFormData({
       name: '',
-      admissionNumber: '',
+      admission_number: '',
       email: '',
       class: ''
     });
@@ -125,7 +146,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
     setEditingStudent(student);
     setFormData({
       name: student.name,
-      admissionNumber: student.admissionNumber,
+      admission_number: student.admission_number || '',
       email: student.email,
       class: student.class
     });
@@ -174,8 +195,8 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
                     <Label htmlFor="admission">Admission Number *</Label>
                     <Input
                       id="admission"
-                      value={formData.admissionNumber}
-                      onChange={(e) => setFormData({...formData, admissionNumber: e.target.value})}
+                      value={formData.admission_number}
+                      onChange={(e) => setFormData({...formData, admission_number: e.target.value})}
                       placeholder="Enter admission number"
                       required
                     />
@@ -245,13 +266,13 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
                         <p className="text-gray-600">{student.email}</p>
                         <div className="flex items-center space-x-4 mt-2">
                           <span className="text-sm">
-                            Admission: <span className="font-medium">{student.admissionNumber}</span>
+                            Admission: <span className="font-medium">{student.admission_number}</span>
                           </span>
                           <span className="text-sm">
                             Class: <span className="font-medium">{student.class}</span>
                           </span>
                           <span className="text-sm text-gray-500">
-                            Registered: {new Date(student.registeredDate).toLocaleDateString()}
+                            Registered: {new Date(student.created_at || '').toLocaleDateString()}
                           </span>
                         </div>
                       </div>
