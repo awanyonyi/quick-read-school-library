@@ -112,6 +112,23 @@ export const createBorrowRecord = async (recordData: {
   student_id: string;
   due_date: string;
 }) => {
+  // First, check if book is available
+  const { data: book, error: bookError } = await supabase
+    .from('books')
+    .select('available_copies')
+    .eq('id', recordData.book_id)
+    .single();
+
+  if (bookError) {
+    console.error('Error fetching book:', bookError);
+    throw bookError;
+  }
+
+  if (book.available_copies <= 0) {
+    throw new Error('Book is not available for borrowing');
+  }
+
+  // Create borrow record
   const { data, error } = await supabase
     .from('borrow_records')
     .insert([{
@@ -126,11 +143,35 @@ export const createBorrowRecord = async (recordData: {
     console.error('Error creating borrow record:', error);
     throw error;
   }
+
+  // Update book availability
+  const { error: updateError } = await supabase
+    .from('books')
+    .update({ available_copies: book.available_copies - 1 })
+    .eq('id', recordData.book_id);
+
+  if (updateError) {
+    console.error('Error updating book availability:', updateError);
+    throw updateError;
+  }
   
   return data;
 };
 
 export const returnBook = async (recordId: string, fine: number = 0) => {
+  // First get the borrow record to get the book_id
+  const { data: borrowRecord, error: fetchError } = await supabase
+    .from('borrow_records')
+    .select('book_id')
+    .eq('id', recordId)
+    .single();
+
+  if (fetchError) {
+    console.error('Error fetching borrow record:', fetchError);
+    throw fetchError;
+  }
+
+  // Update the borrow record
   const { data, error } = await supabase
     .from('borrow_records')
     .update({
@@ -145,6 +186,28 @@ export const returnBook = async (recordId: string, fine: number = 0) => {
   if (error) {
     console.error('Error returning book:', error);
     throw error;
+  }
+
+  // Increment book availability
+  const { data: currentBook, error: bookFetchError } = await supabase
+    .from('books')
+    .select('available_copies')
+    .eq('id', borrowRecord.book_id)
+    .single();
+
+  if (bookFetchError) {
+    console.error('Error fetching book for availability update:', bookFetchError);
+    throw bookFetchError;
+  }
+
+  const { error: updateError } = await supabase
+    .from('books')
+    .update({ available_copies: currentBook.available_copies + 1 })
+    .eq('id', borrowRecord.book_id);
+
+  if (updateError) {
+    console.error('Error updating book availability:', updateError);
+    throw updateError;
   }
   
   return data;

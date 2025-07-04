@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Book, BorrowRecord } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { fetchBooks, fetchBorrowRecords } from '../utils/libraryData';
 import { calculateFine } from '../utils/libraryData';
 import { 
   BookOpen, 
@@ -28,12 +29,18 @@ const StudentDashboard = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    const booksData = JSON.parse(localStorage.getItem('library_books') || '[]');
-    const recordsData = JSON.parse(localStorage.getItem('library_borrow_records') || '[]');
-    
-    setBooks(booksData);
-    setBorrowRecords(recordsData.filter((record: BorrowRecord) => record.student_id === user?.id));
+  const loadData = async () => {
+    try {
+      const [booksData, recordsData] = await Promise.all([
+        fetchBooks(),
+        fetchBorrowRecords()
+      ]);
+      
+      setBooks(booksData as Book[]);
+      setBorrowRecords((recordsData as BorrowRecord[]).filter((record: BorrowRecord) => record.student_id === user?.id));
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
   };
 
   const categories = ['all', ...new Set(books.map(book => book.category))];

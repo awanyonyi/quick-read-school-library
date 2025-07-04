@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Book, Student, BorrowRecord } from '../types';
-import { calculateFine, getBorrowDueDate } from '../utils/libraryData';
+import { calculateFine, getBorrowDueDate, fetchBooks, fetchStudents, fetchBorrowRecords, createBorrowRecord, returnBook } from '../utils/libraryData';
 import { Plus, BookOpen, User, Clock, CheckCircle, AlertTriangle, Search } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -29,14 +29,25 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
     loadData();
   }, []);
 
-  const loadData = () => {
-    const booksData = JSON.parse(localStorage.getItem('library_books') || '[]');
-    const studentsData = JSON.parse(localStorage.getItem('library_students') || '[]');
-    const recordsData = JSON.parse(localStorage.getItem('library_borrow_records') || '[]');
-    
-    setBooks(booksData);
-    setStudents(studentsData);
-    setBorrowRecords(recordsData);
+  const loadData = async () => {
+    try {
+      const [booksData, studentsData, recordsData] = await Promise.all([
+        fetchBooks(),
+        fetchStudents(),
+        fetchBorrowRecords()
+      ]);
+      
+      setBooks(booksData as Book[]);
+      setStudents(studentsData);
+      setBorrowRecords(recordsData as BorrowRecord[]);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load data",
+        variant: "destructive"
+      });
+    }
   };
 
   const availableBooks = books.filter(book => book.available_copies > 0);
@@ -63,7 +74,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
     );
   }, [students, studentSearchQuery]);
 
-  const handleIssueBook = () => {
+  const handleIssueBook = async () => {
     if (!selectedBookId || !selectedStudentId) {
       toast({
         title: "Error",
@@ -99,82 +110,64 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
       return;
     }
 
-    const borrow_date = new Date().toISOString();
-    const due_date = getBorrowDueDate(borrow_date);
+    try {
+      const borrow_date = new Date().toISOString();
+      const due_date = getBorrowDueDate(borrow_date);
 
-    // Create borrow record
-    const newRecord: BorrowRecord = {
-      id: Date.now().toString(),
-      book_id: selectedBookId,
-      student_id: selectedStudentId,
-      borrow_date,
-      return_date: null,
-      due_date,
-      fine: 0,
-      status: 'borrowed'
-    };
+      // Create borrow record in Supabase
+      await createBorrowRecord({
+        book_id: selectedBookId,
+        student_id: selectedStudentId,
+        due_date
+      });
 
-    // Update records
-    const updatedRecords = [...borrowRecords, newRecord];
-    localStorage.setItem('library_borrow_records', JSON.stringify(updatedRecords));
+      toast({
+        title: "Success",
+        description: "Book issued successfully"
+      });
 
-    // Update book availability
-    const updatedBooks = books.map(b => 
-      b.id === selectedBookId 
-        ? { ...b, available_copies: b.available_copies - 1 }
-        : b
-    );
-    localStorage.setItem('library_books', JSON.stringify(updatedBooks));
-
-    toast({
-      title: "Success",
-      description: "Book issued successfully"
-    });
-
-    setSelectedBookId('');
-    setSelectedStudentId('');
-    setBookSearchQuery('');
-    setStudentSearchQuery('');
-    setIsIssueDialogOpen(false);
-    loadData();
-    onUpdate();
+      setSelectedBookId('');
+      setSelectedStudentId('');
+      setBookSearchQuery('');
+      setStudentSearchQuery('');
+      setIsIssueDialogOpen(false);
+      loadData();
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error issuing book:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to issue book",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleReturnBook = (recordId: string) => {
+  const handleReturnBook = async (recordId: string) => {
     const record = borrowRecords.find(r => r.id === recordId);
     if (!record) return;
 
-    const return_date = new Date().toISOString();
-    const fine = calculateFine(record.due_date);
+    try {
+      const fine = calculateFine(record.due_date);
 
-    // Update record
-    const updatedRecords = borrowRecords.map(r => 
-      r.id === recordId 
-        ? {
-            ...r,
-            return_date,
-            fine,
-            status: 'returned' as const
-          }
-        : r
-    );
-    localStorage.setItem('library_borrow_records', JSON.stringify(updatedRecords));
+      // Return book using Supabase
+      await returnBook(recordId, fine);
 
-    // Update book availability
-    const updatedBooks = books.map(b => 
-      b.id === record.book_id 
-        ? { ...b, available_copies: b.available_copies + 1 }
-        : b
-    );
-    localStorage.setItem('library_books', JSON.stringify(updatedBooks));
+      toast({
+        title: "Success",
+        description: `Book returned successfully${fine > 0 ? ` with KES ${fine} fine` : ''}`
+      });
 
-    toast({
-      title: "Success",
-      description: `Book returned successfully${fine > 0 ? ` with KES ${fine} fine` : ''}`
-    });
-
-    loadData();
-    onUpdate();
+      loadData();
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error returning book:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to return book",
+        variant: "destructive"
+      });
+    }
   };
 
   const activeBorrowRecords = borrowRecords.filter(record => record.status === 'borrowed');
@@ -434,9 +427,9 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                               <span className="text-sm">
                                 Returned: {record.return_date ? new Date(record.return_date).toLocaleDateString() : 'N/A'}
                               </span>
-                              {record.fine > 0 && (
+                            {(record.fine_amount || record.fine) && (record.fine_amount || record.fine) > 0 && (
                                 <span className="text-sm text-red-600">
-                                  Fine: KES {record.fine.toLocaleString()}
+                                  Fine: KES {((record.fine_amount || record.fine) as number).toLocaleString()}
                                 </span>
                               )}
                             </div>

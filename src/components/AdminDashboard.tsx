@@ -10,7 +10,7 @@ import { StudentManagement } from './StudentManagement';
 import { BorrowingManagement } from './BorrowingManagement';
 import { WeeklyReport } from './WeeklyReport';
 import { QuickReturnNavbar } from './QuickReturnNavbar';
-import { calculateFine } from '../utils/libraryData';
+import { calculateFine, fetchBooks, fetchStudents, fetchBorrowRecords, returnBook } from '../utils/libraryData';
 import { 
   BookOpen, 
   Users, 
@@ -34,50 +34,46 @@ const AdminDashboard = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    const booksData = JSON.parse(localStorage.getItem('library_books') || '[]');
-    const studentsData = JSON.parse(localStorage.getItem('library_students') || '[]');
-    const recordsData = JSON.parse(localStorage.getItem('library_borrow_records') || '[]');
-    
-    setBooks(booksData);
-    setStudents(studentsData);
-    setBorrowRecords(recordsData);
+  const loadData = async () => {
+    try {
+      const [booksData, studentsData, recordsData] = await Promise.all([
+        fetchBooks(),
+        fetchStudents(),
+        fetchBorrowRecords()
+      ]);
+      
+      setBooks(booksData as Book[]);
+      setStudents(studentsData);
+      setBorrowRecords(recordsData as BorrowRecord[]);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
   };
 
-  const handleQuickReturn = (recordId: string) => {
+  const handleQuickReturn = async (recordId: string) => {
     const record = borrowRecords.find(r => r.id === recordId);
     if (!record) return;
 
-    const return_date = new Date().toISOString();
-    const fine = calculateFine(record.due_date);
+    try {
+      const fine = calculateFine(record.due_date);
 
-    // Update record
-    const updatedRecords = borrowRecords.map(r => 
-      r.id === recordId 
-        ? {
-            ...r,
-            return_date,
-            fine,
-            status: 'returned' as const
-          }
-        : r
-    );
-    localStorage.setItem('library_borrow_records', JSON.stringify(updatedRecords));
+      // Return book using Supabase
+      await returnBook(recordId, fine);
 
-    // Update book availability
-    const updatedBooks = books.map(b => 
-      b.id === record.book_id 
-        ? { ...b, available_copies: b.available_copies + 1 }
-        : b
-    );
-    localStorage.setItem('library_books', JSON.stringify(updatedBooks));
+      toast({
+        title: "Success",
+        description: `Book returned successfully${fine > 0 ? ` with KES ${fine} fine` : ''}`
+      });
 
-    toast({
-      title: "Success",
-      description: `Book returned successfully${fine > 0 ? ` with KES ${fine} fine` : ''}`
-    });
-
-    loadData();
+      loadData();
+    } catch (error: any) {
+      console.error('Error returning book:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to return book",
+        variant: "destructive"
+      });
+    }
   };
 
   const totalBooks = books.reduce((sum, book) => sum + book.total_copies, 0);

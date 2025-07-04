@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Book } from '../types';
 import { Plus, Edit, Trash2, BookOpen } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { fetchBooks, addBook } from '@/utils/libraryData';
 
 interface BookManagementProps {
   onUpdate: () => void;
@@ -47,12 +49,21 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
     loadBooks();
   }, []);
 
-  const loadBooks = () => {
-    const booksData = JSON.parse(localStorage.getItem('library_books') || '[]');
-    setBooks(booksData);
+  const loadBooks = async () => {
+    try {
+      const booksData = await fetchBooks();
+      setBooks(booksData as Book[]);
+    } catch (error) {
+      console.error('Error loading books:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load books",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.title || !formData.author || !formData.category) {
@@ -64,69 +75,90 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
       return;
     }
 
-    const booksData = JSON.parse(localStorage.getItem('library_books') || '[]');
-    
-    if (editingBook) {
-      // Update existing book
-      const updatedBooks = booksData.map((book: Book) => 
-        book.id === editingBook.id 
-          ? {
-              ...book,
-              ...formData,
-              available_copies: book.available_copies + (formData.total_copies - book.total_copies)
-            }
-          : book
-      );
-      localStorage.setItem('library_books', JSON.stringify(updatedBooks));
-      toast({
-        title: "Success",
-        description: "Book updated successfully"
-      });
-    } else {
-      // Add new books - create individual entries for each copy
-      const newBooks: Book[] = [];
-      
-      for (let i = 0; i < formData.total_copies; i++) {
-        const uniqueISBN = generateUniqueISBN([...booksData, ...newBooks]);
-        const newBook: Book = {
-          id: `${Date.now()}_${i}`,
-          title: formData.title,
-          author: formData.author,
-          isbn: uniqueISBN,
-          category: formData.category as Book['category'],
-          total_copies: 1, // Each book is now a single copy with unique ISBN
-          available_copies: 1,
-          created_at: new Date().toISOString()
-        };
-        newBooks.push(newBook);
+    try {
+      if (editingBook) {
+        // Update existing book
+        const { error } = await supabase
+          .from('books')
+          .update({
+            title: formData.title,
+            author: formData.author,
+            category: formData.category,
+            total_copies: formData.total_copies,
+          })
+          .eq('id', editingBook.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Book updated successfully"
+        });
+      } else {
+        // Add new books - create individual entries for each copy
+        const newBooks = [];
+        
+        for (let i = 0; i < formData.total_copies; i++) {
+          const uniqueISBN = generateUniqueISBN([...books]);
+          newBooks.push({
+            title: formData.title,
+            author: formData.author,
+            isbn: uniqueISBN,
+            category: formData.category,
+            total_copies: 1, // Each book is now a single copy with unique ISBN
+            available_copies: 1
+          });
+        }
+        
+        const { error } = await supabase
+          .from('books')
+          .insert(newBooks);
+
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: `${formData.total_copies} book${formData.total_copies > 1 ? 's' : ''} added successfully with unique ISBNs`
+        });
       }
       
-      const updatedBooksData = [...booksData, ...newBooks];
-      localStorage.setItem('library_books', JSON.stringify(updatedBooksData));
+      resetForm();
+      loadBooks();
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error saving book:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save book",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDelete = async (bookId: string) => {
+    try {
+      const { error } = await supabase
+        .from('books')
+        .delete()
+        .eq('id', bookId);
+
+      if (error) throw error;
       
       toast({
         title: "Success",
-        description: `${formData.total_copies} book${formData.total_copies > 1 ? 's' : ''} added successfully with unique ISBNs`
+        description: "Book deleted successfully"
+      });
+      
+      loadBooks();
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error deleting book:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete book",
+        variant: "destructive"
       });
     }
-    
-    resetForm();
-    loadBooks();
-    onUpdate();
-  };
-
-  const handleDelete = (bookId: string) => {
-    const booksData = JSON.parse(localStorage.getItem('library_books') || '[]');
-    const updatedBooks = booksData.filter((book: Book) => book.id !== bookId);
-    localStorage.setItem('library_books', JSON.stringify(updatedBooks));
-    
-    toast({
-      title: "Success",
-      description: "Book deleted successfully"
-    });
-    
-    loadBooks();
-    onUpdate();
   };
 
   const resetForm = () => {

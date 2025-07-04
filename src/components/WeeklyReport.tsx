@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Book, Student, BorrowRecord } from '../types';
+import { fetchBooks, fetchStudents, fetchBorrowRecords } from '../utils/libraryData';
 import { format, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import { CalendarIcon, Printer, FileText, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -27,14 +28,20 @@ export const WeeklyReport: React.FC<WeeklyReportProps> = ({ onUpdate }) => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    const booksData = JSON.parse(localStorage.getItem('library_books') || '[]');
-    const studentsData = JSON.parse(localStorage.getItem('library_students') || '[]');
-    const recordsData = JSON.parse(localStorage.getItem('library_borrow_records') || '[]');
-    
-    setBooks(booksData);
-    setStudents(studentsData);
-    setBorrowRecords(recordsData);
+  const loadData = async () => {
+    try {
+      const [booksData, studentsData, recordsData] = await Promise.all([
+        fetchBooks(),
+        fetchStudents(),
+        fetchBorrowRecords()
+      ]);
+      
+      setBooks(booksData as Book[]);
+      setStudents(studentsData);
+      setBorrowRecords(recordsData as BorrowRecord[]);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
   };
 
   const getWeeklyRecords = () => {
@@ -42,8 +49,8 @@ export const WeeklyReport: React.FC<WeeklyReportProps> = ({ onUpdate }) => {
     const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 }); // Sunday
 
     return borrowRecords.filter(record => {
-      const recordDate = new Date(record.borrowDate);
-      const returnDate = record.returnDate ? new Date(record.returnDate) : null;
+      const recordDate = new Date(record.borrow_date);
+      const returnDate = record.return_date ? new Date(record.return_date) : null;
       
       const isInWeek = isWithinInterval(recordDate, { start: weekStart, end: weekEnd });
       const isReturnInWeek = returnDate ? isWithinInterval(returnDate, { start: weekStart, end: weekEnd }) : false;
@@ -70,18 +77,18 @@ export const WeeklyReport: React.FC<WeeklyReportProps> = ({ onUpdate }) => {
     const csvContent = [
       ['Book Title', 'Author', 'Student Name', 'Class', 'Admission Number', 'Borrow Date', 'Return Date', 'Status', 'Fine (KES)'],
       ...weeklyRecords.map(record => {
-        const book = books.find(b => b.id === record.bookId);
-        const student = students.find(s => s.id === record.studentId);
+        const book = books.find(b => b.id === record.book_id);
+        const student = students.find(s => s.id === record.student_id);
         return [
           book?.title || 'Unknown',
           book?.author || 'Unknown',
           student?.name || 'Unknown',
           student?.class || 'Unknown',
-          student?.admissionNumber || 'Unknown',
-          format(new Date(record.borrowDate), 'yyyy-MM-dd'),
-          record.returnDate ? format(new Date(record.returnDate), 'yyyy-MM-dd') : 'Not returned',
+          student?.admission_number || 'Unknown',
+          format(new Date(record.borrow_date), 'yyyy-MM-dd'),
+          record.return_date ? format(new Date(record.return_date), 'yyyy-MM-dd') : 'Not returned',
           record.status,
-          record.fine.toString()
+          ((record.fine_amount || record.fine) as number || 0).toString()
         ];
       })
     ].map(row => row.join(',')).join('\n');
@@ -102,14 +109,14 @@ export const WeeklyReport: React.FC<WeeklyReportProps> = ({ onUpdate }) => {
   const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
 
   const totalBorrowed = weeklyRecords.filter(r => 
-    isWithinInterval(new Date(r.borrowDate), { start: weekStart, end: weekEnd })
+    isWithinInterval(new Date(r.borrow_date), { start: weekStart, end: weekEnd })
   ).length;
   
   const totalReturned = weeklyRecords.filter(r => 
-    r.returnDate && isWithinInterval(new Date(r.returnDate), { start: weekStart, end: weekEnd })
+    r.return_date && isWithinInterval(new Date(r.return_date), { start: weekStart, end: weekEnd })
   ).length;
   
-  const totalFines = weeklyRecords.reduce((sum, record) => sum + record.fine, 0);
+  const totalFines = weeklyRecords.reduce((sum, record) => sum + ((record.fine_amount || record.fine) as number || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -269,8 +276,8 @@ export const WeeklyReport: React.FC<WeeklyReportProps> = ({ onUpdate }) => {
               </TableHeader>
               <TableBody>
                 {weeklyRecords.map((record) => {
-                  const book = books.find(b => b.id === record.bookId);
-                  const student = students.find(s => s.id === record.studentId);
+                  const book = books.find(b => b.id === record.book_id);
+                  const student = students.find(s => s.id === record.student_id);
                   
                   return (
                     <TableRow key={record.id}>
@@ -282,11 +289,11 @@ export const WeeklyReport: React.FC<WeeklyReportProps> = ({ onUpdate }) => {
                       </TableCell>
                       <TableCell>{student?.name || 'Unknown Student'}</TableCell>
                       <TableCell>{student?.class || 'Unknown'}</TableCell>
-                      <TableCell>{student?.admissionNumber || 'Unknown'}</TableCell>
-                      <TableCell>{format(new Date(record.borrowDate), 'MMM dd, yyyy')}</TableCell>
+                      <TableCell>{student?.admission_number || 'Unknown'}</TableCell>
+                      <TableCell>{format(new Date(record.borrow_date), 'MMM dd, yyyy')}</TableCell>
                       <TableCell>
-                        {record.returnDate 
-                          ? format(new Date(record.returnDate), 'MMM dd, yyyy')
+                        {record.return_date 
+                          ? format(new Date(record.return_date), 'MMM dd, yyyy')
                           : 'Not returned'
                         }
                       </TableCell>
@@ -301,7 +308,7 @@ export const WeeklyReport: React.FC<WeeklyReportProps> = ({ onUpdate }) => {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        {record.fine > 0 ? record.fine.toLocaleString() : '-'}
+                        {((record.fine_amount || record.fine) as number || 0) > 0 ? ((record.fine_amount || record.fine) as number).toLocaleString() : '-'}
                       </TableCell>
                     </TableRow>
                   );
