@@ -1,13 +1,15 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { AuthProvider } from "../contexts/AuthContext";
 import AdminDashboard from "../components/AdminDashboard";
 import StudentDashboard from "../components/StudentDashboard";
 import AuthPage from "../components/AuthPage";
+import HomePage from "../components/HomePage";
 
 const AuthWrapper = () => {
   const { user, isLoading } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
     // Initialize any required data or perform setup
@@ -25,19 +27,22 @@ const AuthWrapper = () => {
     );
   }
 
-  if (!user) {
-    return <AuthPage />;
+  // If user is authenticated, show appropriate dashboard
+  if (user) {
+    if (user.role === 'admin') {
+      return <AdminDashboard />;
+    } else if (user.role === 'student') {
+      return <StudentDashboard />;
+    }
   }
 
-  // Route to appropriate dashboard based on user role
-  if (user.role === 'admin') {
-    return <AdminDashboard />;
-  } else if (user.role === 'student') {
-    return <StudentDashboard />;
+  // If user wants to login, show auth page
+  if (showLogin) {
+    return <AuthPage onBackToHome={() => setShowLogin(false)} />;
   }
 
-  // Fallback - should not reach here normally
-  return <AuthPage />;
+  // Default: show homepage
+  return <HomePage onShowLogin={() => setShowLogin(true)} />;
 };
 
 const Index = () => {

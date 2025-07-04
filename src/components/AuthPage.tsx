@@ -6,10 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, Lock, User, AlertCircle, GraduationCap, Shield, Eye, EyeOff } from 'lucide-react';
+import { BookOpen, Lock, User, AlertCircle, GraduationCap, Shield, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
-const AuthPage = () => {
+interface AuthPageProps {
+  onBackToHome?: () => void;
+}
+
+const AuthPage = ({ onBackToHome }: AuthPageProps) => {
   const { login, isLoading } = useAuth();
   const [adminData, setAdminData] = useState({ username: '', password: '' });
   const [studentData, setStudentData] = useState({ name: '', admissionNumber: '' });
@@ -76,6 +80,19 @@ const AuthPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        {onBackToHome && (
+          <div className="mb-6">
+            <Button
+              variant="ghost"
+              onClick={onBackToHome}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+          </div>
+        )}
+        
         <div className="text-center mb-8">
           <div className="bg-blue-600 p-3 rounded-full inline-block mb-4">
             <BookOpen className="h-8 w-8 text-white" />

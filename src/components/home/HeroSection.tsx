@@ -26,7 +26,7 @@ const HeroSection = ({ onShowLogin }: HeroSectionProps) => {
     <section className="relative overflow-hidden">
       <div className="absolute inset-0">
         <img
-          src={schoolImages[ "/lovable-uploads/4966ace3-8bbd-447b-8523-60a0ff5b4e0b.png"]}
+          src={schoolImages[currentImageIndex]}
           alt="Maryland Secondary School"
           className="w-full h-96 object-cover transition-opacity duration-1000"
         />
