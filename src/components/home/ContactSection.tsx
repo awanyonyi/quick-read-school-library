@@ -47,7 +47,7 @@ const ContactSection = () => {
               <ul className="space-y-3">
                 <li className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                  <span>Book borrowing and returns</span>
+                  <span>Book borrowing and returns in a span of 24 hours</span>
                 </li>
                 <li className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
