@@ -164,15 +164,20 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
 
       // Save successful entries to Supabase
       if (newStudents.length > 0) {
+        console.log('Attempting to save students:', newStudents);
         const { data, error: insertError } = await supabase
           .from('students')
           .insert(newStudents);
 
         if (insertError) {
-          console.error('Error inserting students:', insertError);
+          console.error('Database insert error details:', insertError);
+          console.error('Error code:', insertError.code);
+          console.error('Error message:', insertError.message);
+          console.error('Error details:', insertError.details);
+          console.error('Error hint:', insertError.hint);
           toast({
             title: "Database Error",
-            description: "Failed to save students to database",
+            description: `Failed to save students to database: ${insertError.message}`,
             variant: "destructive"
           });
           setIsUploading(false);
