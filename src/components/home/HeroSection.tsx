@@ -38,7 +38,7 @@ const HeroSection = ({ onShowLogin }: HeroSectionProps) => {
             Welcome to Maryland Senior School
           </h1>
           <p className="text-xl md:text-2xl text-white mb-8 max-w-3xl mx-auto">
-            Excellence in Education - Located in the heart of Subukia Sub-County, Nakuru County
+            School of Winners - Located in the heart of Subukia Sub-County, Nakuru County
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
