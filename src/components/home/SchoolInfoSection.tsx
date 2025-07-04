@@ -10,7 +10,7 @@ const SchoolInfoSection = () => {
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">About Our School</h2>
           <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-            Maryland Senior School is a premier educational Center committed to nurturing 
+            Maryland Senior School is committed to nurturing 
             academic excellence and character development in the beautiful highlands of Nakuru County.
           </p>
         </div>
@@ -40,7 +40,7 @@ const SchoolInfoSection = () => {
             </CardHeader>
             <CardContent>
               <CardDescription className="text-base">
-                Consistently ranking among the top schools in Nakuru County, 
+                Consistently ranking as the top schools in Subukia Sub-County, 
                 we pride ourselves on exceptional academic performance and holistic education.
               </CardDescription>
             </CardContent>
