@@ -50,11 +50,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
-      // Check for hardcoded admin credentials first
-      if (username === 'Maryland@library' && password === 'Maryland_lib2025') {
+      // Try admin login first using secure database lookup
+      const { data: adminData, error: adminError } = await supabase
+        .rpc('verify_admin_password', { 
+          input_username: username, 
+          input_password: password 
+        });
+
+      if (adminError) {
+        console.error('Admin verification error:', adminError);
+      } else if (adminData && adminData.length > 0) {
+        const admin = adminData[0];
         const userProfile: UserProfile = {
-          id: 'admin-1',
-          name: 'Library Administrator',
+          id: admin.admin_id,
+          name: admin.admin_name,
           role: 'admin',
           email: undefined
         };
