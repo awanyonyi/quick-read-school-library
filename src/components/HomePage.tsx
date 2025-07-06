@@ -12,7 +12,7 @@ interface HomePageProps {
 
 const HomePage = ({ onShowLogin }: HomePageProps) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+    <div className="min-h-screen bg-gradient-background">
       <HomeNavigation onShowLogin={onShowLogin} />
       <HeroSection onShowLogin={onShowLogin} />
       <SchoolInfoSection />

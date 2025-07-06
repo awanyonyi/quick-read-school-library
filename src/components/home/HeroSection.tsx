@@ -44,14 +44,14 @@ const HeroSection = ({ onShowLogin }: HeroSectionProps) => {
             <Button
               size="lg"
               onClick={onShowLogin}
-              className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
+              className="bg-primary hover:bg-primary/80 text-primary-foreground text-lg px-8 py-3"
             >
               Access Library System
             </Button>
             <Button
               size="lg"
               variant="outline"
-              className="bg-white/10 border-white text-white hover:bg-white hover:text-gray-900 text-lg px-8 py-3"
+              className="bg-white/10 border-white text-white hover:bg-white hover:text-primary text-lg px-8 py-3"
             >
               Learn More
             </Button>

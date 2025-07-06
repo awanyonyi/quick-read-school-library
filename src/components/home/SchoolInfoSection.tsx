@@ -16,10 +16,10 @@ const SchoolInfoSection = () => {
         </div>
         
         <div className="grid md:grid-cols-3 gap-8">
-          <Card className="text-center hover:shadow-lg transition-shadow">
+          <Card className="text-center hover:shadow-card transition-all duration-300 hover:scale-105 bg-gradient-accent border-0">
             <CardHeader>
-              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <BookOpen className="h-8 w-8 text-blue-600" />
+              <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-primary">
+                <BookOpen className="h-8 w-8 text-primary" />
               </div>
               <CardTitle>Modern Library</CardTitle>
             </CardHeader>
@@ -31,10 +31,10 @@ const SchoolInfoSection = () => {
             </CardContent>
           </Card>
 
-          <Card className="text-center hover:shadow-lg transition-shadow">
+          <Card className="text-center hover:shadow-card transition-all duration-300 hover:scale-105 bg-gradient-accent border-0">
             <CardHeader>
-              <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Award className="h-8 w-8 text-green-600" />
+              <div className="bg-accent/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-primary">
+                <Award className="h-8 w-8 text-accent-foreground" />
               </div>
               <CardTitle>Academic Excellence</CardTitle>
             </CardHeader>
@@ -46,10 +46,10 @@ const SchoolInfoSection = () => {
             </CardContent>
           </Card>
 
-          <Card className="text-center hover:shadow-lg transition-shadow">
+          <Card className="text-center hover:shadow-card transition-all duration-300 hover:scale-105 bg-gradient-accent border-0">
             <CardHeader>
-              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="h-8 w-8 text-purple-600" />
+              <div className="bg-secondary/50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-primary">
+                <Users className="h-8 w-8 text-secondary-foreground" />
               </div>
               <CardTitle>Dedicated Faculty</CardTitle>
             </CardHeader>
