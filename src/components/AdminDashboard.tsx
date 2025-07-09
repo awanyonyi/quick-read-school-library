@@ -10,6 +10,7 @@ import { WeeklyReport } from './WeeklyReport';
 import { QuickReturnNavbar } from './QuickReturnNavbar';
 import { DashboardStats } from './dashboard/DashboardStats';
 import { StudentSearch } from './dashboard/StudentSearch';
+import { BorrowingRecordSearch } from './dashboard/BorrowingRecordSearch';
 import { RecentActivity } from './dashboard/RecentActivity';
 import { calculateFine, fetchBooks, fetchStudents, fetchBorrowRecords, returnBook } from '../utils/libraryData';
 import { 
@@ -149,6 +150,7 @@ const AdminDashboard = () => {
           <div className="space-y-6">
             <DashboardStats books={books} borrowRecords={borrowRecords} />
             <StudentSearch />
+            <BorrowingRecordSearch />
             <RecentActivity books={books} students={students} borrowRecords={borrowRecords} />
           </div>
         )}
