@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
+    PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
   public: {
     Tables: {
@@ -151,6 +151,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      change_admin_password: {
+        Args: {
+          admin_username: string
+          current_password: string
+          new_password: string
+        }
+        Returns: {
+          success: boolean
+          message: string
+        }[]
+      }
       verify_admin_password: {
         Args: { input_username: string; input_password: string }
         Returns: {
