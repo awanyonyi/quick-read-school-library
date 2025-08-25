@@ -12,6 +12,7 @@ import { DashboardStats } from './dashboard/DashboardStats';
 import { StudentSearch } from './dashboard/StudentSearch';
 import { BorrowingRecordSearch } from './dashboard/BorrowingRecordSearch';
 import { RecentActivity } from './dashboard/RecentActivity';
+import AdminPasswordReset from './dashboard/AdminPasswordReset';
 import { calculateFine, fetchBooks, fetchStudents, fetchBorrowRecords, returnBook } from '../utils/libraryData';
 import { 
   BookOpen, 
@@ -19,7 +20,8 @@ import {
   Clock, 
   LogOut,
   Library,
-  FileText
+  FileText,
+  Settings
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -81,7 +83,8 @@ const AdminDashboard = () => {
     { id: 'books', label: 'Books', icon: BookOpen },
     { id: 'students', label: 'Students', icon: Users },
     { id: 'borrowing', label: 'Borrowing', icon: Clock },
-    { id: 'reports', label: 'Weekly Reports', icon: FileText }
+    { id: 'reports', label: 'Weekly Reports', icon: FileText },
+    { id: 'settings', label: 'Settings', icon: Settings }
   ];
 
   return (
@@ -159,6 +162,15 @@ const AdminDashboard = () => {
         {activeTab === 'students' && <StudentManagement onUpdate={loadData} />}
         {activeTab === 'borrowing' && <BorrowingManagement onUpdate={loadData} />}
         {activeTab === 'reports' && <WeeklyReport onUpdate={loadData} />}
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Admin Settings</h2>
+              <p className="text-gray-600">Manage your admin account settings</p>
+            </div>
+            <AdminPasswordReset />
+          </div>
+        )}
       </main>
     </div>
   );
