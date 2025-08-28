@@ -1,18 +1,39 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-export const calculateFine = (dueDate: string): number => {
+export const isOverdue = (dueDate: string): boolean => {
   const due = new Date(dueDate);
   const now = new Date();
-  const diffTime = now.getTime() - due.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  return diffDays > 0 ? diffDays * 500 : 0; // KES 500 per day
+  return now > due;
 };
 
-export const getBorrowDueDate = (borrowDate: string): string => {
+export const calculateDueDate = (
+  borrowDate: string,
+  duePeriodValue: number = 24,
+  duePeriodUnit: string = 'hours'
+): string => {
   const borrow = new Date(borrowDate);
-  borrow.setHours(borrow.getHours() + 24); // 24 hours from borrow time
+  
+  switch (duePeriodUnit) {
+    case 'hours':
+      borrow.setHours(borrow.getHours() + duePeriodValue);
+      break;
+    case 'days':
+      borrow.setDate(borrow.getDate() + duePeriodValue);
+      break;
+    case 'weeks':
+      borrow.setDate(borrow.getDate() + (duePeriodValue * 7));
+      break;
+    case 'months':
+      borrow.setMonth(borrow.getMonth() + duePeriodValue);
+      break;
+    case 'years':
+      borrow.setFullYear(borrow.getFullYear() + duePeriodValue);
+      break;
+    default:
+      borrow.setHours(borrow.getHours() + 24); // fallback to 24 hours
+  }
+  
   return borrow.toISOString();
 };
 
@@ -69,12 +90,16 @@ export const addBook = async (bookData: {
   isbn: string;
   category: string;
   total_copies: number;
+  due_period_value?: number;
+  due_period_unit?: string;
 }) => {
   const { data, error } = await supabase
     .from('books')
     .insert([{
       ...bookData,
-      available_copies: bookData.total_copies
+      available_copies: bookData.total_copies,
+      due_period_value: bookData.due_period_value || 24,
+      due_period_unit: bookData.due_period_unit || 'hours'
     }])
     .select()
     .single();
@@ -110,12 +135,30 @@ export const addStudent = async (studentData: {
 export const createBorrowRecord = async (recordData: {
   book_id: string;
   student_id: string;
-  due_date: string;
 }) => {
-  // First, check if book is available
+  // Check if student is blacklisted
+  const { data: student, error: studentError } = await supabase
+    .from('students')
+    .select('blacklisted, blacklist_until')
+    .eq('id', recordData.student_id)
+    .single();
+
+  if (studentError) {
+    console.error('Error fetching student:', studentError);
+    throw studentError;
+  }
+
+  if (student.blacklisted) {
+    const blacklistUntil = student.blacklist_until ? new Date(student.blacklist_until) : null;
+    if (!blacklistUntil || blacklistUntil > new Date()) {
+      throw new Error('Student is currently blacklisted and cannot borrow books');
+    }
+  }
+
+  // Check if book is available and get due period settings
   const { data: book, error: bookError } = await supabase
     .from('books')
-    .select('available_copies')
+    .select('available_copies, due_period_value, due_period_unit')
     .eq('id', recordData.book_id)
     .single();
 
@@ -128,12 +171,22 @@ export const createBorrowRecord = async (recordData: {
     throw new Error('Book is not available for borrowing');
   }
 
+  // Calculate due date based on book's settings
+  const borrowDate = new Date().toISOString();
+  const dueDate = calculateDueDate(
+    borrowDate,
+    book.due_period_value || 24,
+    book.due_period_unit || 'hours'
+  );
+
   // Create borrow record
   const { data, error } = await supabase
     .from('borrow_records')
     .insert([{
-      ...recordData,
-      borrow_date: new Date().toISOString(),
+      book_id: recordData.book_id,
+      student_id: recordData.student_id,
+      borrow_date: borrowDate,
+      due_date: dueDate,
       status: 'borrowed'
     }])
     .select()
@@ -158,7 +211,7 @@ export const createBorrowRecord = async (recordData: {
   return data;
 };
 
-export const returnBook = async (recordId: string, fine: number = 0) => {
+export const returnBook = async (recordId: string) => {
   // First get the borrow record to get the book_id
   const { data: borrowRecord, error: fetchError } = await supabase
     .from('borrow_records')
@@ -176,8 +229,7 @@ export const returnBook = async (recordId: string, fine: number = 0) => {
     .from('borrow_records')
     .update({
       return_date: new Date().toISOString(),
-      status: 'returned',
-      fine_amount: fine
+      status: 'returned'
     })
     .eq('id', recordId)
     .select()
@@ -211,4 +263,46 @@ export const returnBook = async (recordId: string, fine: number = 0) => {
   }
   
   return data;
+};
+
+// Functions for blacklist management
+export const unblacklistStudent = async (studentId: string, reason: string) => {
+  const { data, error } = await supabase
+    .from('students')
+    .update({
+      blacklisted: false,
+      blacklist_until: null,
+      blacklist_reason: reason
+    })
+    .eq('id', studentId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error unblacklisting student:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+// Function to check and auto-blacklist overdue students
+export const processOverdueBooks = async () => {
+  const { error } = await supabase.rpc('auto_blacklist_overdue_students');
+  
+  if (error) {
+    console.error('Error processing overdue books:', error);
+    throw error;
+  }
+};
+
+// Legacy compatibility functions
+export const calculateFine = (dueDate: string): number => {
+  // Return 0 since we no longer use fines
+  return 0;
+};
+
+export const getBorrowDueDate = (borrowDate: string): string => {
+  // Use default 24 hours for backward compatibility
+  return calculateDueDate(borrowDate, 24, 'hours');
 };

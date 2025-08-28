@@ -4,9 +4,11 @@ export interface Book {
   title: string;
   author: string;
   isbn: string;
-  category: 'Science' | 'Language' | 'Technicals and Applied' | 'Humanities' | 'Maths';
+  category: string;
   total_copies: number;
   available_copies: number;
+  due_period_value?: number;
+  due_period_unit?: string;
   created_at: string;
 }
 
@@ -17,6 +19,9 @@ export interface Student {
   email: string;
   class: string;
   created_at?: string;
+  blacklisted?: boolean;
+  blacklist_until?: string;
+  blacklist_reason?: string;
   // Legacy properties for backward compatibility
   admissionNumber?: string;
   registeredDate?: string;
@@ -56,4 +61,12 @@ export interface Profile {
   admission_number?: string;
   email: string;
   created_at: string;
+}
+
+export interface LibrarySettings {
+  id: string;
+  setting_key: string;
+  setting_value: string;
+  created_at: string;
+  updated_at: string;
 }

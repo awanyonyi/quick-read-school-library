@@ -44,6 +44,8 @@ export type Database = {
           available_copies: number
           category: string
           created_at: string | null
+          due_period_unit: string | null
+          due_period_value: number | null
           id: string
           isbn: string | null
           title: string
@@ -54,6 +56,8 @@ export type Database = {
           available_copies?: number
           category: string
           created_at?: string | null
+          due_period_unit?: string | null
+          due_period_value?: number | null
           id?: string
           isbn?: string | null
           title: string
@@ -64,6 +68,8 @@ export type Database = {
           available_copies?: number
           category?: string
           created_at?: string | null
+          due_period_unit?: string | null
+          due_period_value?: number | null
           id?: string
           isbn?: string | null
           title?: string
@@ -119,9 +125,36 @@ export type Database = {
           },
         ]
       }
+      library_settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          setting_key: string
+          setting_value: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          setting_key: string
+          setting_value: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       students: {
         Row: {
           admission_number: string
+          blacklist_reason: string | null
+          blacklist_until: string | null
+          blacklisted: boolean | null
           class: string | null
           created_at: string | null
           email: string | null
@@ -130,6 +163,9 @@ export type Database = {
         }
         Insert: {
           admission_number: string
+          blacklist_reason?: string | null
+          blacklist_until?: string | null
+          blacklisted?: boolean | null
           class?: string | null
           created_at?: string | null
           email?: string | null
@@ -138,6 +174,9 @@ export type Database = {
         }
         Update: {
           admission_number?: string
+          blacklist_reason?: string | null
+          blacklist_until?: string | null
+          blacklisted?: boolean | null
           class?: string | null
           created_at?: string | null
           email?: string | null
@@ -151,6 +190,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      auto_blacklist_overdue_students: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       change_admin_password: {
         Args: {
           admin_username: string

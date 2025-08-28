@@ -57,14 +57,12 @@ const AdminDashboard = () => {
     if (!record) return;
 
     try {
-      const fine = calculateFine(record.due_date);
-
       // Return book using Supabase
-      await returnBook(recordId, fine);
+      await returnBook(recordId);
 
       toast({
         title: "Success",
-        description: `Book returned successfully${fine > 0 ? ` with KES ${fine} fine` : ''}`
+        description: "Book returned successfully"
       });
 
       loadData();
