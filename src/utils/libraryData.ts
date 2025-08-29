@@ -135,6 +135,8 @@ export const addStudent = async (studentData: {
 export const createBorrowRecord = async (recordData: {
   book_id: string;
   student_id: string;
+  due_period_value?: number;
+  due_period_unit?: string;
 }) => {
   // Check if student is blacklisted
   const { data: student, error: studentError } = await supabase
@@ -171,12 +173,12 @@ export const createBorrowRecord = async (recordData: {
     throw new Error('Book is not available for borrowing');
   }
 
-  // Calculate due date based on book's settings
+  // Calculate due date based on custom period or book's default settings
   const borrowDate = new Date().toISOString();
   const dueDate = calculateDueDate(
     borrowDate,
-    book.due_period_value || 24,
-    book.due_period_unit || 'hours'
+    recordData.due_period_value || book.due_period_value || 24,
+    recordData.due_period_unit || book.due_period_unit || 'hours'
   );
 
   // Create borrow record
