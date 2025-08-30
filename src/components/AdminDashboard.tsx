@@ -1,4 +1,4 @@
-
+import schoolLogo from '@/assets/school-logo.jpeg'
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Book, Student, BorrowRecord } from '../types';
@@ -91,10 +91,13 @@ const AdminDashboard = () => {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="bg-blue-600 p-2 rounded-lg">
-                <BookOpen className="h-6 w-6 text-white" />
-              </div>
+            <div className="flex items-center space-x-4">
+              <img
+                src={schoolLogo}
+                alt="School Logo"
+                className="h-14 w-14 object-contain rounded-full border border-gray-300 shadow"
+                style={{ marginBottom: 0 }}
+              />
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">Library Admin</h1>
                 <p className="text-sm text-gray-500">Welcome, {user?.name}</p>

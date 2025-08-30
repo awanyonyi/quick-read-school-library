@@ -1,6 +1,5 @@
 
-import React from 'react';
-import { BookOpen } from 'lucide-react';
+import schoolLogo from '@/assets/school-logo.jpeg'
 
 const HomeFooter = () => {
   return (
@@ -8,10 +7,10 @@ const HomeFooter = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center">
           <div className="flex justify-center items-center space-x-3 mb-4">
-            <div className="bg-primary p-2 rounded-full">
-              <BookOpen className="h-5 w-5 text-primary-foreground" />
+            <div className="mb-4">
+              <img src={schoolLogo} alt="School Logo" className="h-20 w-20 object-contain mx-auto mb-5" />
+              <h3 className="text-lg font-semibold">Maryland Senior School</h3>
             </div>
-            <h3 className="text-lg font-semibold">Maryland Senior School</h3>
           </div>
           <p className="text-gray-400 mb-4">
             School Motto:Education is a compass
