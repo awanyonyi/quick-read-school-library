@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '../contexts/AuthContext';
 import { BookOpen, Lock, User, AlertCircle, GraduationCap, Shield, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import schoolLogo from '@/assets/school-logo.png';
 
 interface AuthPageProps {
   onBackToHome?: () => void;
@@ -94,8 +95,11 @@ const AuthPage = ({ onBackToHome }: AuthPageProps) => {
         )}
         
         <div className="text-center mb-8">
-          <div className="bg-blue-600 p-3 rounded-full inline-block mb-4">
-            <BookOpen className="h-8 w-8 text-white" />
+          <div className="mb-4">
+            <img src={schoolLogo} alt="School Logo" className="h-16 w-16 object-contain mx-auto mb-3" />
+            <div className="bg-blue-600 p-3 rounded-full inline-block">
+              <BookOpen className="h-8 w-8 text-white" />
+            </div>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Maryland Senior School</h1>
           <p className="text-gray-600">Library Management System</p>

@@ -2,6 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { BookOpen, Users, GraduationCap } from 'lucide-react';
+import schoolLogo from '@/assets/school-logo.png';
 
 interface HomeNavigationProps {
   onShowLogin: () => void;
@@ -13,6 +14,7 @@ const HomeNavigation = ({ onShowLogin }: HomeNavigationProps) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-3">
+            <img src={schoolLogo} alt="School Logo" className="h-12 w-12 object-contain" />
             <div className="bg-primary p-2 rounded-full">
               <BookOpen className="h-6 w-6 text-primary-foreground" />
             </div>

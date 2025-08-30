@@ -138,7 +138,31 @@ export const createBorrowRecord = async (recordData: {
   due_period_value?: number;
   due_period_unit?: string;
 }) => {
-  // Check if student is blacklisted
+  // First, automatically process overdue books to update blacklist status
+  try {
+    await processOverdueBooks();
+  } catch (error) {
+    console.warn('Error processing overdue books:', error);
+  }
+
+  // Check if student has any overdue books or is blacklisted
+  const { data: overdueRecords, error: overdueError } = await supabase
+    .from('borrow_records')
+    .select('id')
+    .eq('student_id', recordData.student_id)
+    .eq('status', 'borrowed')
+    .lt('due_date', new Date().toISOString());
+
+  if (overdueError) {
+    console.error('Error checking overdue records:', overdueError);
+    throw overdueError;
+  }
+
+  if (overdueRecords && overdueRecords.length > 0) {
+    throw new Error('Student has overdue books and cannot borrow until they are returned and blacklist is cleared by admin');
+  }
+
+  // Check if student is currently blacklisted
   const { data: student, error: studentError } = await supabase
     .from('students')
     .select('blacklisted, blacklist_until')
@@ -153,7 +177,7 @@ export const createBorrowRecord = async (recordData: {
   if (student.blacklisted) {
     const blacklistUntil = student.blacklist_until ? new Date(student.blacklist_until) : null;
     if (!blacklistUntil || blacklistUntil > new Date()) {
-      throw new Error('Student is currently blacklisted and cannot borrow books');
+      throw new Error('Student is currently blacklisted and cannot borrow books until cleared by admin');
     }
   }
 
