@@ -108,7 +108,7 @@ const AuthPage = ({ onBackToHome }: AuthPageProps) => {
         <Tabs defaultValue="student" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="student">Student Login</TabsTrigger>
-            <TabsTrigger value="admin">Admin Login</TabsTrigger>
+            <TabsTrigger value="admin">Librarian Login</TabsTrigger>
           </TabsList>
 
           <TabsContent value="student">
