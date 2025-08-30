@@ -133,11 +133,11 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
       setIsIssueDialogOpen(false);
       loadData();
       onUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error issuing book:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to issue book",
+        description: (error instanceof Error ? error.message : "Failed to issue book"),
         variant: "destructive"
       });
     }
@@ -160,11 +160,11 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
 
       loadData();
       onUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error returning book:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to return book",
+        description: (error instanceof Error ? error.message : "Failed to return book"),
         variant: "destructive"
       });
     }
