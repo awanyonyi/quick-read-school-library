@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { BookManagement } from './BookManagement';
 import { StudentManagement } from './StudentManagement';
 import { BorrowingManagement } from './BorrowingManagement';
+import BlacklistManagement from './BlacklistManagement';
 import { WeeklyReport } from './WeeklyReport';
 import { QuickReturnNavbar } from './QuickReturnNavbar';
 import { DashboardStats } from './dashboard/DashboardStats';
@@ -21,7 +22,8 @@ import {
   LogOut,
   Library,
   FileText,
-  Settings
+  Settings,
+  UserX
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -81,6 +83,7 @@ const AdminDashboard = () => {
     { id: 'books', label: 'Books', icon: BookOpen },
     { id: 'students', label: 'Students', icon: Users },
     { id: 'borrowing', label: 'Borrowing', icon: Clock },
+    { id: 'blacklist', label: 'Blacklist', icon: UserX },
     { id: 'reports', label: 'Weekly Reports', icon: FileText },
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
@@ -159,6 +162,7 @@ const AdminDashboard = () => {
         {activeTab === 'books' && <BookManagement onUpdate={loadData} />}
         {activeTab === 'students' && <StudentManagement onUpdate={loadData} />}
         {activeTab === 'borrowing' && <BorrowingManagement onUpdate={loadData} />}
+        {activeTab === 'blacklist' && <BlacklistManagement onUpdate={loadData} />}
         {activeTab === 'reports' && <WeeklyReport onUpdate={loadData} />}
         {activeTab === 'settings' && (
           <div className="space-y-6">
