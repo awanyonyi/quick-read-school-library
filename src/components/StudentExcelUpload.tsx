@@ -24,14 +24,14 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
   const downloadTemplate = () => {
     const templateData = [
       {
-        'Admission Number': 'STD001',
-        'Name': 'John Doe',
-        'Class': 'Grade 10A'
+        'Admission Number': '2343',
+        'Name': 'John Mwangi',
+        'Class': '2E'
       },
       {
-        'Admission Number': 'STD002',
-        'Name': 'Jane Smith',
-        'Class': 'Grade 10B'
+        'Admission Number': '3243',
+        'Name': 'Jane Wangari',
+        'Class': '4W'
       }
     ];
 

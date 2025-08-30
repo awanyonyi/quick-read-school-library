@@ -24,6 +24,8 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [bookSearchQuery, setBookSearchQuery] = useState('');
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [borrowPeriodValue, setBorrowPeriodValue] = useState('');
+  const [borrowPeriodUnit, setBorrowPeriodUnit] = useState('days');
 
   useEffect(() => {
     loadData();
@@ -75,10 +77,10 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
   }, [students, studentSearchQuery]);
 
   const handleIssueBook = async () => {
-    if (!selectedBookId || !selectedStudentId) {
+    if (!selectedBookId || !selectedStudentId || !borrowPeriodValue) {
       toast({
         title: "Error",
-        description: "Please select both a book and a student",
+        description: "Please select book, student, and borrowing period",
         variant: "destructive"
       });
       return;
@@ -111,14 +113,12 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
     }
 
     try {
-      const borrow_date = new Date().toISOString();
-      const due_date = getBorrowDueDate(borrow_date);
-
-      // Create borrow record in Supabase
+      // Create borrow record with custom period in Supabase
       await createBorrowRecord({
         book_id: selectedBookId,
         student_id: selectedStudentId,
-        due_date
+        due_period_value: parseInt(borrowPeriodValue),
+        due_period_unit: borrowPeriodUnit
       });
 
       toast({
@@ -130,6 +130,8 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
       setSelectedStudentId('');
       setBookSearchQuery('');
       setStudentSearchQuery('');
+      setBorrowPeriodValue('');
+      setBorrowPeriodUnit('days');
       setIsIssueDialogOpen(false);
       loadData();
       onUpdate();
@@ -148,14 +150,12 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
     if (!record) return;
 
     try {
-      const fine = calculateFine(record.due_date);
-
       // Return book using Supabase
-      await returnBook(recordId, fine);
+      await returnBook(recordId);
 
       toast({
         title: "Success",
-        description: `Book returned successfully${fine > 0 ? ` with KES ${fine} fine` : ''}`
+        description: "Book returned successfully"
       });
 
       loadData();
@@ -268,10 +268,42 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                         {studentSearchQuery ? 'No students found matching your search' : 'No students available'}
                       </div>
                     )}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                   </SelectContent>
+                 </Select>
+               </div>
+
+               {/* Borrowing Period Selection */}
+               <div className="space-y-3">
+                 <label className="text-sm font-medium">Borrowing Period</label>
+                 <div className="flex space-x-2">
+                   <Input
+                     type="number"
+                     placeholder="Enter period"
+                     value={borrowPeriodValue}
+                     onChange={(e) => setBorrowPeriodValue(e.target.value)}
+                     min="1"
+                     className="flex-1"
+                   />
+                   <Select value={borrowPeriodUnit} onValueChange={setBorrowPeriodUnit}>
+                     <SelectTrigger className="w-32">
+                       <SelectValue />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="hours">Hours</SelectItem>
+                       <SelectItem value="days">Days</SelectItem>
+                       <SelectItem value="weeks">Weeks</SelectItem>
+                       <SelectItem value="months">Months</SelectItem>
+                       <SelectItem value="years">Years</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+                 {borrowPeriodValue && (
+                   <p className="text-sm text-muted-foreground">
+                     Book will be due in {borrowPeriodValue} {borrowPeriodUnit}
+                   </p>
+                 )}
+               </div>
+             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsIssueDialogOpen(false)}>
                 Cancel
