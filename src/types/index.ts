@@ -22,6 +22,9 @@ export interface Student {
   blacklisted?: boolean;
   blacklist_until?: string;
   blacklist_reason?: string;
+  biometric_enrolled?: boolean;
+  biometric_id?: string;
+  biometric_data?: any;
   // Legacy properties for backward compatibility
   admissionNumber?: string;
   registeredDate?: string;

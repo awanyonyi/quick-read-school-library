@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Student } from '../types';
-import { Plus, Edit, Trash2, User, Upload } from 'lucide-react';
+import { Plus, Edit, Trash2, User, Upload, Fingerprint, Shield } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { StudentExcelUpload } from './StudentExcelUpload';
+import { BiometricEnrollment } from './BiometricEnrollment';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchStudents, addStudent } from '@/utils/libraryData';
 
@@ -21,6 +22,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [showExcelUpload, setShowExcelUpload] = useState(false);
+  const [biometricEnrollmentStudent, setBiometricEnrollmentStudent] = useState<Student | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     admission_number: '',
@@ -153,6 +155,14 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
     setIsAddDialogOpen(true);
   };
 
+  const openBiometricEnrollment = (student: Student) => {
+    setBiometricEnrollmentStudent(student);
+  };
+
+  const closeBiometricEnrollment = () => {
+    setBiometricEnrollmentStudent(null);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -271,26 +281,42 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
                           <span className="text-sm">
                             Class: <span className="font-medium">{student.class}</span>
                           </span>
-                          <span className="text-sm text-gray-500">
-                            Registered: {new Date(student.created_at || '').toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => openEditDialog(student)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleDelete(student.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                           <span className="text-sm text-gray-500">
+                             Registered: {new Date(student.created_at || '').toLocaleDateString()}
+                           </span>
+                           {student.biometric_enrolled && (
+                             <div className="flex items-center gap-1 mt-1">
+                               <Shield className="h-3 w-3 text-green-600" />
+                               <span className="text-xs text-green-600 font-medium">Biometric Enrolled</span>
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                   <div className="flex space-x-2">
+                     {!student.biometric_enrolled && (
+                       <Button 
+                         variant="outline" 
+                         size="sm" 
+                         onClick={() => openBiometricEnrollment(student)}
+                         className="text-blue-600 hover:text-blue-700"
+                       >
+                         <Fingerprint className="h-4 w-4" />
+                       </Button>
+                     )}
+                     <Button variant="outline" size="sm" onClick={() => openEditDialog(student)}>
+                       <Edit className="h-4 w-4" />
+                     </Button>
+                     <Button 
+                       variant="outline" 
+                       size="sm" 
+                       onClick={() => handleDelete(student.id)}
+                       className="text-red-600 hover:text-red-700"
+                     >
+                       <Trash2 className="h-4 w-4" />
+                     </Button>
+                   </div>
                 </div>
               </div>
             ))}
@@ -313,6 +339,20 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
           </div>
         </CardContent>
       </Card>
+
+      {/* Biometric Enrollment Dialog */}
+      {biometricEnrollmentStudent && (
+        <BiometricEnrollment
+          isOpen={true}
+          onClose={closeBiometricEnrollment}
+          studentId={biometricEnrollmentStudent.id}
+          studentName={biometricEnrollmentStudent.name}
+          onEnrollmentComplete={() => {
+            loadStudents();
+            onUpdate();
+          }}
+        />
+      )}
     </div>
   );
 };
