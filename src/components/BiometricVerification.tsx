@@ -25,53 +25,48 @@ export const BiometricVerification: React.FC<BiometricVerificationProps> = ({
   const [verifiedStudent, setVerifiedStudent] = useState<Student | null>(null);
 
   const handleVerificationSuccess = async (verificationData: string) => {
-    setIsVerifying(true);
-    
     try {
-      // In a real implementation, you would validate the biometric data against stored credentials
-      // For demo purposes, we'll simulate verification by checking enrolled students
+      // Parse the verification response from BiometricAuth
+      const parsedData = JSON.parse(verificationData);
       
-      const { data: students, error } = await supabase
-        .from('students')
-        .select('*')
-        .eq('biometric_enrolled', true);
+      if (parsedData.success && parsedData.studentId) {
+        // Fetch full student details
+        const { data: student, error } = await supabase
+          .from('students')
+          .select('*')
+          .eq('id', parsedData.studentId)
+          .single();
 
-      if (error) throw error;
+        if (error) {
+          console.error('Error fetching student:', error);
+          onVerificationError('Database error during verification');
+          return;
+        }
 
-      if (students && students.length > 0) {
-        // Simulate finding a matching student (in real app, this would be based on actual biometric matching)
-        const matchedStudent = students[0]; // For demo, just take the first enrolled student
-        
-        setVerifiedStudent(matchedStudent);
-        setVerificationStep('success');
-        
-        toast({
-          title: "Verification Successful",
-          description: `Identity verified for ${matchedStudent.name}`
-        });
+        if (student) {
+          setVerifiedStudent(student);
+          setVerificationStep('success');
+          
+          toast({
+            title: "Verification Successful",
+            description: `Identity verified for ${student.name}`
+          });
 
-        // Pass the verified student to parent component
-        setTimeout(() => {
-          onVerificationSuccess(matchedStudent);
-          onClose();
-          resetVerification();
-        }, 2000);
-
+          // Pass the verified student to parent component
+          setTimeout(() => {
+            onVerificationSuccess(student);
+            onClose();
+            resetVerification();
+          }, 2000);
+        } else {
+          onVerificationError('Student not found');
+        }
       } else {
-        throw new Error('No enrolled biometric data found. Please enroll first.');
+        onVerificationError(parsedData.message || 'Biometric verification failed');
       }
-
     } catch (error: any) {
-      console.error('Error verifying biometric data:', error);
-      const errorMessage = error.message || "Failed to verify biometric data";
-      onVerificationError(errorMessage);
-      toast({
-        title: "Verification Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    } finally {
-      setIsVerifying(false);
+      console.error('Verification error:', error);
+      onVerificationError('Verification failed');
     }
   };
 

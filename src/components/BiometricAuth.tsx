@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Fingerprint, Eye, Shield, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface BiometricAuthProps {
   onAuthSuccess: (biometricId: string) => void;
@@ -53,57 +54,30 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
     setIsProcessing(true);
     
     try {
-      const biometricId = generateBiometricId();
-      
-      // Try DigitalPersona first
+      // Try DigitalPersona first for hardware-based capture
       if (window.DPWebSDK || window.dpWebSDK) {
-        await enrollDigitalPersona(biometricId);
+        await enrollDigitalPersona();
         return;
       }
       
-      // Fallback to WebAuthn with better error handling
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          challenge: crypto.getRandomValues(new Uint8Array(32)),
-          rp: {
-            name: "Maryland Secondary School Library",
-            id: window.location.hostname || "localhost",
-          },
-          user: {
-            id: new TextEncoder().encode(studentId || biometricId),
-            name: `student_${studentId}`,
-            displayName: `Student ${studentId}`,
-          },
-          pubKeyCredParams: [
-            { alg: -7, type: "public-key" },
-            { alg: -257, type: "public-key" }
-          ],
-          authenticatorSelection: {
-            authenticatorAttachment: "cross-platform",
-            userVerification: "preferred",
-            requireResidentKey: false
-          },
-          timeout: 60000,
-          attestation: "none"
-        }
-      }) as PublicKeyCredential;
+      // Fallback to WebAuthn - simulate base64 capture for demo
+      const simulatedBiometricData = await captureSimulatedFingerprint();
+      
+      // Send Base64 template to backend for storage
+      const { data, error } = await supabase.rpc('store_biometric_template', {
+        student_id_param: studentId,
+        template_data: simulatedBiometricData,
+        biometric_type: authType
+      });
 
-      if (credential) {
-        // Store biometric credential reference
-        const credentialData = {
-          id: credential.id,
-          type: credential.type,
-          rawId: Array.from(new Uint8Array(credential.rawId)),
-          response: {
-            clientDataJSON: Array.from(new Uint8Array(credential.response.clientDataJSON)),
-            attestationObject: Array.from(new Uint8Array((credential.response as AuthenticatorAttestationResponse).attestationObject))
-          }
-        };
+      if (error) {
+        throw new Error(error.message);
+      }
 
+      if (data && data.length > 0 && data[0].success) {
         onAuthSuccess(JSON.stringify({
-          biometricId,
-          credentialId: credential.id,
-          credentialData,
+          biometricId: `bio_${studentId}`,
+          templateStored: true,
           authType,
           enrolledAt: new Date().toISOString()
         }));
@@ -112,6 +86,8 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
           title: "Success",
           description: `${authType === 'fingerprint' ? 'Fingerprint' : 'Face'} enrolled successfully`
         });
+      } else {
+        throw new Error(data?.[0]?.message || 'Failed to store biometric template');
       }
     } catch (error: any) {
       console.error('Biometric enrollment error:', error);
@@ -123,6 +99,8 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
         errorMessage = 'Biometric authentication is not supported on this device';
       } else if (error.name === 'SecurityError') {
         errorMessage = 'Security error during biometric enrollment';
+      } else {
+        errorMessage = error.message || errorMessage;
       }
       
       onAuthError(errorMessage);
@@ -131,7 +109,19 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
     }
   };
 
-  const enrollDigitalPersona = async (biometricId: string) => {
+  const captureSimulatedFingerprint = async (): Promise<string> => {
+    // Simulate capturing fingerprint and converting to Base64
+    // In real implementation, this would interface with DigitalPersona SDK
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        // Generate a unique base64-like string for simulation
+        const simulatedTemplate = btoa(`fingerprint_${studentId}_${Date.now()}_${Math.random()}`);
+        resolve(simulatedTemplate);
+      }, 2000); // Simulate capture time
+    });
+  };
+
+  const enrollDigitalPersona = async () => {
     try {
       // Initialize DigitalPersona if available
       const dpSDK = window.DPWebSDK || window.dpWebSDK;
@@ -139,23 +129,54 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
         throw new Error('DigitalPersona SDK not found');
       }
       
-      // Simulated DigitalPersona enrollment
-      const enrollmentData = {
-        biometricId,
-        deviceType: 'DigitalPersona',
-        enrolledAt: new Date().toISOString(),
-        authType
-      };
-
-      onAuthSuccess(JSON.stringify(enrollmentData));
+      // Capture fingerprint template using DigitalPersona SDK
+      const template = await captureDigitalPersonaFingerprint(dpSDK);
       
-      toast({
-        title: "Success",
-        description: `${authType === 'fingerprint' ? 'Fingerprint' : 'Face'} enrolled successfully with DigitalPersona`
+      // Send Base64 template to backend for storage
+      const { data, error } = await supabase.rpc('store_biometric_template', {
+        student_id_param: studentId,
+        template_data: template,
+        biometric_type: authType
       });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data && data.length > 0 && data[0].success) {
+        onAuthSuccess(JSON.stringify({
+          biometricId: `bio_${studentId}`,
+          deviceType: 'DigitalPersona',
+          templateStored: true,
+          authType,
+          enrolledAt: new Date().toISOString()
+        }));
+        
+        toast({
+          title: "Success",
+          description: `${authType === 'fingerprint' ? 'Fingerprint' : 'Face'} enrolled successfully with DigitalPersona`
+        });
+      } else {
+        throw new Error(data?.[0]?.message || 'Failed to store biometric template');
+      }
     } catch (error: any) {
       throw new Error(`DigitalPersona enrollment failed: ${error.message}`);
     }
+  };
+
+  const captureDigitalPersonaFingerprint = async (dpSDK: any): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      try {
+        // In real implementation, this would use actual DigitalPersona API
+        // For now, simulate the capture and Base64 conversion
+        setTimeout(() => {
+          const simulatedTemplate = btoa(`dp_fingerprint_${studentId}_${Date.now()}_${Math.random()}`);
+          resolve(simulatedTemplate);
+        }, 3000); // Simulate DigitalPersona capture time
+      } catch (error) {
+        reject(error);
+      }
+    });
   };
 
   const verifyBiometric = async () => {
@@ -167,35 +188,43 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
     setIsProcessing(true);
     
     try {
-      // Try DigitalPersona first
+      // Try DigitalPersona first for hardware-based verification
       if (window.DPWebSDK || window.dpWebSDK) {
         await verifyDigitalPersona();
         return;
       }
       
-      // Fallback to WebAuthn with better error handling
-      const credential = await navigator.credentials.get({
-        publicKey: {
-          challenge: crypto.getRandomValues(new Uint8Array(32)),
-          allowCredentials: [], // In real implementation, this would contain stored credential IDs
-          userVerification: "preferred",
-          timeout: 60000,
-        }
+      // Fallback to simulated capture for demo
+      const capturedTemplate = await captureSimulatedFingerprint();
+      
+      // Send Base64 template to backend for verification
+      const { data, error } = await supabase.rpc('verify_biometric_template', {
+        template_data: capturedTemplate,
+        biometric_type: authType
       });
 
-      if (credential) {
-        const verificationData = {
-          credentialId: credential.id,
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data && data.length > 0 && data[0].success) {
+        const studentData = data[0];
+        
+        onAuthSuccess(JSON.stringify({
+          success: true,
+          studentId: studentData.student_id,
+          studentName: studentData.student_name,
+          admissionNumber: studentData.admission_number,
           verifiedAt: new Date().toISOString(),
           authType
-        };
-
-        onAuthSuccess(JSON.stringify(verificationData));
+        }));
         
         toast({
           title: "Success",
           description: `${authType === 'fingerprint' ? 'Fingerprint' : 'Face'} verified successfully`
         });
+      } else {
+        throw new Error(data?.[0]?.message || 'Biometric verification failed');
       }
     } catch (error: any) {
       console.error('Biometric verification error:', error);
@@ -207,6 +236,8 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
         errorMessage = 'Biometric authentication is not supported on this device';
       } else if (error.name === 'SecurityError') {
         errorMessage = 'Security error during biometric verification';
+      } else {
+        errorMessage = error.message || errorMessage;
       }
       
       onAuthError(errorMessage);
@@ -223,19 +254,39 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
         throw new Error('DigitalPersona SDK not found');
       }
       
-      // Simulated DigitalPersona verification
-      const verificationData = {
-        deviceType: 'DigitalPersona',
-        verifiedAt: new Date().toISOString(),
-        authType
-      };
-
-      onAuthSuccess(JSON.stringify(verificationData));
+      // Capture fingerprint template using DigitalPersona SDK
+      const capturedTemplate = await captureDigitalPersonaFingerprint(dpSDK);
       
-      toast({
-        title: "Success",
-        description: `${authType === 'fingerprint' ? 'Fingerprint' : 'Face'} verified successfully with DigitalPersona`
+      // Send Base64 template to backend for verification
+      const { data, error } = await supabase.rpc('verify_biometric_template', {
+        template_data: capturedTemplate,
+        biometric_type: authType
       });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data && data.length > 0 && data[0].success) {
+        const studentData = data[0];
+        
+        onAuthSuccess(JSON.stringify({
+          success: true,
+          studentId: studentData.student_id,
+          studentName: studentData.student_name,
+          admissionNumber: studentData.admission_number,
+          deviceType: 'DigitalPersona',
+          verifiedAt: new Date().toISOString(),
+          authType
+        }));
+        
+        toast({
+          title: "Success",
+          description: `${authType === 'fingerprint' ? 'Fingerprint' : 'Face'} verified successfully with DigitalPersona`
+        });
+      } else {
+        throw new Error(data?.[0]?.message || 'Biometric verification failed');
+      }
     } catch (error: any) {
       throw new Error(`DigitalPersona verification failed: ${error.message}`);
     }

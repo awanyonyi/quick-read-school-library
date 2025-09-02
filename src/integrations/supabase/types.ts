@@ -214,11 +214,32 @@ export type Database = {
           success: boolean
         }[]
       }
+      store_biometric_template: {
+        Args: {
+          biometric_type?: string
+          student_id_param: string
+          template_data: string
+        }
+        Returns: {
+          message: string
+          success: boolean
+        }[]
+      }
       verify_admin_password: {
         Args: { input_password: string; input_username: string }
         Returns: {
           admin_id: string
           admin_name: string
+        }[]
+      }
+      verify_biometric_template: {
+        Args: { biometric_type?: string; template_data: string }
+        Returns: {
+          admission_number: string
+          message: string
+          student_id: string
+          student_name: string
+          success: boolean
         }[]
       }
     }
