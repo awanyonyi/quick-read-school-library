@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Book, Student, BorrowRecord } from '../types';
 import { calculateFine, getBorrowDueDate, fetchBooks, fetchStudents, fetchBorrowRecords, createBorrowRecord, returnBook } from '../utils/libraryData';
-import { Plus, BookOpen, User, Clock, CheckCircle, AlertTriangle, Search } from 'lucide-react';
+import { Plus, BookOpen, User, Clock, CheckCircle, AlertTriangle, Search, Shield } from 'lucide-react';
+import { BiometricVerification } from './BiometricVerification';
 import { toast } from '@/hooks/use-toast';
 
 interface BorrowingManagementProps {
@@ -26,6 +27,15 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [borrowPeriodValue, setBorrowPeriodValue] = useState('');
   const [borrowPeriodUnit, setBorrowPeriodUnit] = useState('days');
+  const [showBiometricVerification, setShowBiometricVerification] = useState(false);
+  const [pendingIssueData, setPendingIssueData] = useState<{
+    bookId: string;
+
+
+
+
+    borrowPeriod: { value: number; unit: string };
+  } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -77,10 +87,10 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
   }, [students, studentSearchQuery]);
 
   const handleIssueBook = async () => {
-    if (!selectedBookId || !selectedStudentId || !borrowPeriodValue) {
+    if (!selectedBookId || !borrowPeriodValue) {
       toast({
         title: "Error",
-        description: "Please select book, student, and borrowing period",
+        description: "Please select book and borrowing period",
         variant: "destructive"
       });
       return;
@@ -96,10 +106,24 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
       return;
     }
 
+    // Store the pending issue data and show biometric verification
+    setPendingIssueData({
+      bookId: selectedBookId,
+      borrowPeriod: {
+        value: parseInt(borrowPeriodValue),
+        unit: borrowPeriodUnit
+      }
+    });
+    setShowBiometricVerification(true);
+  };
+
+  const handleBiometricVerificationSuccess = async (verifiedStudent: Student) => {
+    if (!pendingIssueData) return;
+
     // Check if student already has this book
     const existingRecord = borrowRecords.find(record => 
-      record.book_id === selectedBookId && 
-      record.student_id === selectedStudentId && 
+      record.book_id === pendingIssueData.bookId && 
+      record.student_id === verifiedStudent.id && 
       record.status === 'borrowed'
     );
 
@@ -109,23 +133,26 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
         description: "Student already has this book borrowed",
         variant: "destructive"
       });
+      setShowBiometricVerification(false);
+      setPendingIssueData(null);
       return;
     }
 
     try {
-      // Create borrow record with custom period in Supabase
+      // Create borrow record with verified student
       await createBorrowRecord({
-        book_id: selectedBookId,
-        student_id: selectedStudentId,
-        due_period_value: parseInt(borrowPeriodValue),
-        due_period_unit: borrowPeriodUnit
+        book_id: pendingIssueData.bookId,
+        student_id: verifiedStudent.id,
+        due_period_value: pendingIssueData.borrowPeriod.value,
+        due_period_unit: pendingIssueData.borrowPeriod.unit
       });
 
       toast({
         title: "Success",
-        description: "Book issued successfully"
+        description: `Book issued successfully to ${verifiedStudent.name}`
       });
 
+      // Reset form
       setSelectedBookId('');
       setSelectedStudentId('');
       setBookSearchQuery('');
@@ -133,6 +160,8 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
       setBorrowPeriodValue('');
       setBorrowPeriodUnit('days');
       setIsIssueDialogOpen(false);
+      setShowBiometricVerification(false);
+      setPendingIssueData(null);
       loadData();
       onUpdate();
     } catch (error: unknown) {
@@ -143,6 +172,11 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
         variant: "destructive"
       });
     }
+  };
+
+  const handleBiometricVerificationError = (error: string) => {
+    setShowBiometricVerification(false);
+    setPendingIssueData(null);
   };
 
   const handleReturnBook = async (recordId: string) => {
@@ -189,9 +223,12 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
           </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
-              <DialogTitle>Issue Book</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                Issue Book with Biometric Authentication
+              </DialogTitle>
               <DialogDescription>
-                Select a book and student to issue a book
+                Select a book and set borrowing period. Student identity will be verified using biometric authentication.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-6 py-4">
@@ -235,42 +272,16 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                 </Select>
               </div>
 
-              {/* Student Selection with Search */}
-              <div className="space-y-3">
-                <label className="text-sm font-medium">Select Student</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <Input
-                    placeholder="Search by name or admission number..."
-                    value={studentSearchQuery}
-                    onChange={(e) => setStudentSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
+              {/* Biometric Authentication Notice */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="h-4 w-4 text-blue-600" />
+                  <span className="font-medium text-blue-800 text-sm">Biometric Authentication Required</span>
                 </div>
-                <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a student..." />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {filteredStudents.length > 0 ? (
-                      filteredStudents.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{student.name}</span>
-                            <span className="text-sm text-gray-500">
-                              {student.admission_number} • {student.class}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-sm text-gray-500 text-center">
-                        {studentSearchQuery ? 'No students found matching your search' : 'No students available'}
-                      </div>
-                    )}
-                   </SelectContent>
-                 </Select>
-               </div>
+                <p className="text-xs text-blue-700">
+                  Student identity will be verified using biometric authentication (fingerprint or face recognition) before book issuance.
+                </p>
+              </div>
 
                {/* Borrowing Period Selection */}
                <div className="space-y-3">
@@ -304,14 +315,15 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                  )}
                </div>
              </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsIssueDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleIssueBook}>
-                Issue Book
-              </Button>
-            </DialogFooter>
+             <DialogFooter>
+               <Button variant="outline" onClick={() => setIsIssueDialogOpen(false)}>
+                 Cancel
+               </Button>
+               <Button onClick={handleIssueBook} className="flex items-center gap-2">
+                 <Shield className="h-4 w-4" />
+                 Proceed with Biometric Verification
+               </Button>
+             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
@@ -484,6 +496,17 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
           </div>
         </CardContent>
       </Card>
+
+      {/* Biometric Verification Dialog */}
+      <BiometricVerification
+        isOpen={showBiometricVerification}
+        onClose={() => {
+          setShowBiometricVerification(false);
+          setPendingIssueData(null);
+        }}
+        onVerificationSuccess={handleBiometricVerificationSuccess}
+        onVerificationError={handleBiometricVerificationError}
+      />
     </div>
   );
 };

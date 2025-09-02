@@ -152,6 +152,9 @@ export type Database = {
       students: {
         Row: {
           admission_number: string
+          biometric_data: Json | null
+          biometric_enrolled: boolean | null
+          biometric_id: string | null
           blacklist_reason: string | null
           blacklist_until: string | null
           blacklisted: boolean | null
@@ -163,6 +166,9 @@ export type Database = {
         }
         Insert: {
           admission_number: string
+          biometric_data?: Json | null
+          biometric_enrolled?: boolean | null
+          biometric_id?: string | null
           blacklist_reason?: string | null
           blacklist_until?: string | null
           blacklisted?: boolean | null
@@ -174,6 +180,9 @@ export type Database = {
         }
         Update: {
           admission_number?: string
+          biometric_data?: Json | null
+          biometric_enrolled?: boolean | null
+          biometric_id?: string | null
           blacklist_reason?: string | null
           blacklist_until?: string | null
           blacklisted?: boolean | null
