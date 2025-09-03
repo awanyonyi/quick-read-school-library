@@ -24,9 +24,19 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
 
   // Check if biometric authentication is supported (WebAuthn or DigitalPersona)
   const isBiometricSupported = () => {
-    // Check for DigitalPersona SDK
+    // Check for DigitalPersona SDK and drivers
     if (window.DPWebSDK || window.dpWebSDK) {
       return true;
+    }
+    
+    // Check for DigitalPersona ActiveX controls (legacy support)
+    try {
+      const activeXControl = new ActiveXObject("DPFPCtl.DPFPControl");
+      if (activeXControl) {
+        return true;
+      }
+    } catch (e) {
+      // ActiveX not available, continue checking
     }
     
     // Check for WebAuthn with proper permission handling
@@ -123,14 +133,36 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
 
   const enrollDigitalPersona = async () => {
     try {
-      // Initialize DigitalPersona if available
+      console.log('Starting DigitalPersona enrollment...');
+      
+      // Check for DigitalPersona SDK availability
       const dpSDK = window.DPWebSDK || window.dpWebSDK;
       if (!dpSDK) {
-        throw new Error('DigitalPersona SDK not found');
+        // Try alternative detection methods
+        if (typeof ActiveXObject !== 'undefined') {
+          try {
+            new ActiveXObject("DPFPCtl.DPFPControl");
+            throw new Error('DigitalPersona ActiveX detected but Web SDK not available. Please ensure DigitalPersona Web SDK is properly installed.');
+          } catch (activeXError) {
+            throw new Error('DigitalPersona SDK not found. Please install DigitalPersona software and ensure drivers are properly configured.');
+          }
+        } else {
+          throw new Error('DigitalPersona SDK not found. Please install DigitalPersona software with Web SDK support.');
+        }
       }
+      
+      console.log('DigitalPersona SDK found, capturing fingerprint...');
+      
+      // Show user feedback
+      toast({
+        title: "Ready to Capture",
+        description: "Please place your finger on the DigitalPersona sensor"
+      });
       
       // Capture fingerprint template using DigitalPersona SDK
       const template = await captureDigitalPersonaFingerprint(dpSDK);
+      
+      console.log('Fingerprint captured, storing template...');
       
       // Send Base64 template to backend for storage
       const { data, error } = await supabase.rpc('store_biometric_template', {
@@ -144,22 +176,26 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
       }
 
       if (data && data.length > 0 && data[0].success) {
-        onAuthSuccess(JSON.stringify({
+        const enrollmentData = {
           biometricId: `bio_${studentId}`,
           deviceType: 'DigitalPersona',
           templateStored: true,
           authType,
-          enrolledAt: new Date().toISOString()
-        }));
+          enrolledAt: new Date().toISOString(),
+          sdkVersion: dpSDK.version || 'Unknown'
+        };
+        
+        onAuthSuccess(JSON.stringify(enrollmentData));
         
         toast({
-          title: "Success",
-          description: `${authType === 'fingerprint' ? 'Fingerprint' : 'Face'} enrolled successfully with DigitalPersona`
+          title: "Enrollment Successful",
+          description: `${authType === 'fingerprint' ? 'Fingerprint' : 'Face'} enrolled successfully with DigitalPersona device`
         });
       } else {
         throw new Error(data?.[0]?.message || 'Failed to store biometric template');
       }
     } catch (error: any) {
+      console.error('DigitalPersona enrollment error:', error);
       throw new Error(`DigitalPersona enrollment failed: ${error.message}`);
     }
   };
@@ -167,42 +203,101 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
   const captureDigitalPersonaFingerprint = async (dpSDK: any): Promise<string> => {
     return new Promise((resolve, reject) => {
       try {
-        // Import and Initialize FingerprintReader
-        const FingerprintReader = dpSDK.FingerprintReader;
-        const reader = new FingerprintReader();
+        // Initialize DigitalPersona SDK
+        console.log('Initializing DigitalPersona SDK...');
         
+        // Check for different SDK versions and initialization methods
+        let fingerprintReader;
+        
+        if (dpSDK.FingerprintReader) {
+          // Web SDK version
+          fingerprintReader = new dpSDK.FingerprintReader();
+        } else if (dpSDK.createFingerprintReader) {
+          // Alternative SDK version
+          fingerprintReader = dpSDK.createFingerprintReader();
+        } else {
+          throw new Error('DigitalPersona FingerprintReader not found in SDK');
+        }
+        
+        let captureTimeout: NodeJS.Timeout;
         let capturedSample: any = null;
         
-        // Listen for Captured Samples
-        reader.on('SampleAcquired', (sample: any) => {
+        // Set capture timeout (30 seconds)
+        captureTimeout = setTimeout(() => {
+          fingerprintReader.stopAcquisition?.().catch(() => {});
+          reject(new Error('Fingerprint capture timeout - please try again'));
+        }, 30000);
+        
+        // Listen for successful capture
+        fingerprintReader.on('SampleAcquired', (sample: any) => {
+          clearTimeout(captureTimeout);
           capturedSample = sample;
-          console.log('Fingerprint sample acquired');
+          console.log('Fingerprint sample acquired successfully');
           
-          // Stop Capture When Done
-          reader.stopAcquisition()
+          // Stop capture and process sample
+          fingerprintReader.stopAcquisition()
             .then(() => {
-              // Convert sample to Base64 template
-              const base64Template = btoa(JSON.stringify(sample.Data || sample));
-              resolve(base64Template);
+              try {
+                // Extract template data - handle different SDK response formats
+                let templateData;
+                if (sample.Data) {
+                  templateData = sample.Data;
+                } else if (sample.template) {
+                  templateData = sample.template;
+                } else if (sample.raw) {
+                  templateData = sample.raw;
+                } else {
+                  templateData = sample;
+                }
+                
+                // Convert to base64 for storage
+                const base64Template = typeof templateData === 'string' 
+                  ? btoa(templateData) 
+                  : btoa(JSON.stringify(templateData));
+                
+                console.log('Template processed and converted to base64');
+                resolve(base64Template);
+              } catch (processError) {
+                reject(new Error(`Failed to process fingerprint template: ${processError}`));
+              }
             })
-            .catch((error: any) => reject(error));
+            .catch((stopError: any) => {
+              reject(new Error(`Failed to stop fingerprint capture: ${stopError.message}`));
+            });
         });
         
-        reader.on('ErrorOccurred', (error: any) => {
-          reader.stopAcquisition().catch(() => {});
-          reject(new Error(`DigitalPersona capture error: ${error.message}`));
+        // Listen for capture errors
+        fingerprintReader.on('ErrorOccurred', (error: any) => {
+          clearTimeout(captureTimeout);
+          fingerprintReader.stopAcquisition?.().catch(() => {});
+          console.error('DigitalPersona capture error:', error);
+          reject(new Error(`Fingerprint capture failed: ${error.message || 'Unknown error'}`));
         });
         
-        // Start Fingerprint Capture
-        reader.startAcquisition({
-          format: dpSDK.SampleFormat.PngImage,
-          resolution: 500,
-          compression: dpSDK.CompressionAlgorithm.None
-        }).catch((error: any) => {
-          reject(new Error(`Failed to start fingerprint capture: ${error.message}`));
+        // Listen for quality feedback
+        fingerprintReader.on('QualityReported', (quality: any) => {
+          console.log('Fingerprint quality:', quality);
+          // You can add UI feedback here for quality
         });
+        
+        // Start fingerprint capture with optimal settings
+        const captureSettings = {
+          format: dpSDK.SampleFormat?.PngImage || 'PngImage',
+          resolution: 500, // Standard resolution
+          compression: dpSDK.CompressionAlgorithm?.None || 'None'
+        };
+        
+        console.log('Starting fingerprint capture with settings:', captureSettings);
+        
+        fingerprintReader.startAcquisition(captureSettings)
+          .catch((startError: any) => {
+            clearTimeout(captureTimeout);
+            console.error('Failed to start fingerprint capture:', startError);
+            reject(new Error(`Failed to start fingerprint capture: ${startError.message}`));
+          });
         
       } catch (error: any) {
+        console.error('DigitalPersona initialization failed:', error);
         reject(new Error(`DigitalPersona initialization failed: ${error.message}`));
       }
     });
@@ -277,14 +372,26 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
 
   const verifyDigitalPersona = async () => {
     try {
-      // Initialize DigitalPersona if available
+      console.log('Starting DigitalPersona verification...');
+      
+      // Check for DigitalPersona SDK availability
       const dpSDK = window.DPWebSDK || window.dpWebSDK;
       if (!dpSDK) {
-        throw new Error('DigitalPersona SDK not found');
+        throw new Error('DigitalPersona SDK not found. Please ensure DigitalPersona software is running.');
       }
+      
+      console.log('DigitalPersona SDK found, capturing fingerprint for verification...');
+      
+      // Show user feedback
+      toast({
+        title: "Ready to Verify",
+        description: "Please place your finger on the DigitalPersona sensor"
+      });
       
       // Capture fingerprint template using DigitalPersona SDK
       const capturedTemplate = await captureDigitalPersonaFingerprint(dpSDK);
+      
+      console.log('Fingerprint captured, verifying against database...');
       
       // Send Base64 template to backend for verification
       const { data, error } = await supabase.rpc('verify_biometric_template', {
@@ -299,24 +406,28 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
       if (data && data.length > 0 && data[0].success) {
         const studentData = data[0];
         
-        onAuthSuccess(JSON.stringify({
+        const verificationData = {
           success: true,
           studentId: studentData.student_id,
           studentName: studentData.student_name,
           admissionNumber: studentData.admission_number,
           deviceType: 'DigitalPersona',
           verifiedAt: new Date().toISOString(),
-          authType
-        }));
+          authType,
+          sdkVersion: dpSDK.version || 'Unknown'
+        };
+        
+        onAuthSuccess(JSON.stringify(verificationData));
         
         toast({
-          title: "Success",
-          description: `${authType === 'fingerprint' ? 'Fingerprint' : 'Face'} verified successfully with DigitalPersona`
+          title: "Verification Successful",
+          description: `Welcome ${studentData.student_name}! Identity verified with DigitalPersona device`
         });
       } else {
-        throw new Error(data?.[0]?.message || 'Biometric verification failed');
+        throw new Error(data?.[0]?.message || 'Biometric verification failed - no matching fingerprint found');
       }
     } catch (error: any) {
+      console.error('DigitalPersona verification error:', error);
       throw new Error(`DigitalPersona verification failed: ${error.message}`);
     }
   };
@@ -338,16 +449,22 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
             Biometric Not Supported
           </CardTitle>
           <CardDescription>
-            Biometric authentication is not available. Please ensure DigitalPersona software is installed or use a supported browser.
+            Biometric authentication is not available. Please ensure DigitalPersona drivers and SDK are installed.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              For DigitalPersona devices: Ensure the DigitalPersona software is installed and running.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              For browser authentication: Use HTTPS and a supported browser (Chrome, Firefox, Edge).
+          <div className="space-y-3">
+            <div className="p-3 bg-muted rounded-lg">
+              <h4 className="font-medium text-sm mb-2">DigitalPersona Setup:</h4>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                <li>• Install DigitalPersona software with Web SDK</li>
+                <li>• Ensure drivers are properly configured</li>
+                <li>• Connect your DigitalPersona fingerprint device</li>
+                <li>• Run the DigitalPersona service</li>
+              </ul>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              If you have the software installed, try refreshing the page or restarting the DigitalPersona service.
             </p>
           </div>
         </CardContent>
