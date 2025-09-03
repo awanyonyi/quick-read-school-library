@@ -167,14 +167,43 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
   const captureDigitalPersonaFingerprint = async (dpSDK: any): Promise<string> => {
     return new Promise((resolve, reject) => {
       try {
-        // In real implementation, this would use actual DigitalPersona API
-        // For now, simulate the capture and Base64 conversion
-        setTimeout(() => {
-          const simulatedTemplate = btoa(`dp_fingerprint_${studentId}_${Date.now()}_${Math.random()}`);
-          resolve(simulatedTemplate);
-        }, 3000); // Simulate DigitalPersona capture time
-      } catch (error) {
-        reject(error);
+        // Import and Initialize FingerprintReader
+        const FingerprintReader = dpSDK.FingerprintReader;
+        const reader = new FingerprintReader();
+        
+        let capturedSample: any = null;
+        
+        // Listen for Captured Samples
+        reader.on('SampleAcquired', (sample: any) => {
+          capturedSample = sample;
+          console.log('Fingerprint sample acquired');
+          
+          // Stop Capture When Done
+          reader.stopAcquisition()
+            .then(() => {
+              // Convert sample to Base64 template
+              const base64Template = btoa(JSON.stringify(sample.Data || sample));
+              resolve(base64Template);
+            })
+            .catch((error: any) => reject(error));
+        });
+        
+        reader.on('ErrorOccurred', (error: any) => {
+          reader.stopAcquisition().catch(() => {});
+          reject(new Error(`DigitalPersona capture error: ${error.message}`));
+        });
+        
+        // Start Fingerprint Capture
+        reader.startAcquisition({
+          format: dpSDK.SampleFormat.PngImage,
+          resolution: 500,
+          compression: dpSDK.CompressionAlgorithm.None
+        }).catch((error: any) => {
+          reject(new Error(`Failed to start fingerprint capture: ${error.message}`));
+        });
+        
+      } catch (error: any) {
+        reject(new Error(`DigitalPersona initialization failed: ${error.message}`));
       }
     });
   };
