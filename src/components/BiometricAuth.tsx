@@ -45,6 +45,10 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
       });
     });
 
+    reader.on("SamplesAcquired", (event: any) => {
+      console.log("Fingerprint samples acquired:", event.samples);
+    });
+
     reader.on("ErrorOccurred", (err) => {
       console.error("DigitalPersona reader error:", err);
     });
