@@ -19,4 +19,21 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      external: [
+        'WebSdk',
+        '@digitalpersona/devices/dist/es5/devices/websdk/channel',
+      ],
+      output: {
+        globals: {
+          'WebSdk': 'WebSdk',
+          '@digitalpersona/devices/dist/es5/devices/websdk/channel': 'WebSdkChannel'
+        }
+      }
+    }
+  },
+  optimizeDeps: {
+    exclude: ['@digitalpersona/devices']
+  }
 }));

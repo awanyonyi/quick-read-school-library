@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Fingerprint, Eye, Shield, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { FingerprintReader, SampleFormat } from '@digitalpersona/devices';
 
 interface BiometricAuthProps {
   onAuthSuccess: (biometricId: string) => void;
@@ -22,40 +21,54 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [authType, setAuthType] = useState<'fingerprint' | 'face'>('fingerprint');
-  const [fingerprintReader, setFingerprintReader] = useState<FingerprintReader | null>(null);
+  const [fingerprintReader, setFingerprintReader] = useState<any>(null);
 
   useEffect(() => {
-    const reader = new FingerprintReader();
-    setFingerprintReader(reader);
+    // Initialize DigitalPersona reader using window SDK directly
+    const initializeReader = async () => {
+      try {
+        const dpSDK = (window as any).DPWebSDK || (window as any).dpWebSDK;
+        if (dpSDK && dpSDK.FingerprintReader) {
+          const reader = new dpSDK.FingerprintReader();
+          setFingerprintReader(reader);
 
-    reader.on("DeviceConnected", () => {
-      console.log("DigitalPersona reader connected");
-      toast({
-        title: "Device Connected",
-        description: "DigitalPersona fingerprint reader is ready"
-      });
-    });
+          reader.on("DeviceConnected", () => {
+            console.log("DigitalPersona reader connected");
+            toast({
+              title: "Device Connected",
+              description: "DigitalPersona fingerprint reader is ready"
+            });
+          });
 
-    reader.on("DeviceDisconnected", () => {
-      console.log("DigitalPersona reader disconnected");
-      toast({
-        title: "Device Disconnected",
-        description: "DigitalPersona fingerprint reader disconnected",
-        variant: "destructive"
-      });
-    });
+          reader.on("DeviceDisconnected", () => {
+            console.log("DigitalPersona reader disconnected");
+            toast({
+              title: "Device Disconnected",
+              description: "DigitalPersona fingerprint reader disconnected",
+              variant: "destructive"
+            });
+          });
 
-    reader.on("SamplesAcquired", (event: any) => {
-      console.log("Fingerprint samples acquired:", event.samples);
-    });
+          reader.on("SamplesAcquired", (event: any) => {
+            console.log("Fingerprint samples acquired:", event.samples);
+          });
 
-    reader.on("ErrorOccurred", (err) => {
-      console.error("DigitalPersona reader error:", err);
-    });
+          reader.on("ErrorOccurred", (err: any) => {
+            console.error("DigitalPersona reader error:", err);
+          });
+        }
+      } catch (error) {
+        console.log("DigitalPersona SDK not available, will use alternative methods");
+      }
+    };
+
+    initializeReader();
 
     return () => {
-      reader.stopAcquisition().catch(() => {});
-      reader.off(); // remove listeners
+      if (fingerprintReader) {
+        fingerprintReader.stopAcquisition?.().catch(() => {});
+        fingerprintReader.off?.(); // remove listeners
+      }
     };
   }, []);
 
@@ -178,7 +191,7 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
         reject(new Error('Fingerprint capture timeout'));
       }, 30000);
 
-      fingerprintReader.startAcquisition(SampleFormat.Intermediate)
+      fingerprintReader.startAcquisition('Intermediate')
         .catch((error) => {
           clearTimeout(timeout);
           reject(new Error(`Failed to start fingerprint capture: ${error.message}`));
