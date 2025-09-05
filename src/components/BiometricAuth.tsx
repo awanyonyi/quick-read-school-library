@@ -27,35 +27,68 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
     // Initialize DigitalPersona reader using window SDK directly
     const initializeReader = async () => {
       try {
-        const dpSDK = (window as any).DPWebSDK || (window as any).dpWebSDK;
-        if (dpSDK && dpSDK.FingerprintReader) {
-          const reader = new dpSDK.FingerprintReader();
-          setFingerprintReader(reader);
+        // Wait for DOM to be ready
+        await new Promise(resolve => {
+          if (document.readyState === 'complete') {
+            resolve(true);
+          } else {
+            window.addEventListener('load', () => resolve(true));
+          }
+        });
 
-          reader.on("DeviceConnected", () => {
-            console.log("DigitalPersona reader connected");
-            toast({
-              title: "Device Connected",
-              description: "DigitalPersona fingerprint reader is ready"
+        // Check for DigitalPersona SDK in multiple ways
+        const dpSDK = (window as any).DPWebSDK || 
+                      (window as any).dpWebSDK || 
+                      (window as any).DigitalPersona ||
+                      (window as any).DPFP;
+        
+        console.log("Checking for DigitalPersona SDK:", !!dpSDK);
+        
+        if (dpSDK) {
+          let reader;
+          
+          // Try different initialization methods
+          if (dpSDK.FingerprintReader) {
+            reader = new dpSDK.FingerprintReader();
+          } else if (dpSDK.createFingerprintReader) {
+            reader = dpSDK.createFingerprintReader();
+          } else if (dpSDK.WebSdk && dpSDK.WebSdk.FingerprintReader) {
+            reader = new dpSDK.WebSdk.FingerprintReader();
+          }
+          
+          if (reader) {
+            console.log("DigitalPersona reader initialized successfully");
+            setFingerprintReader(reader);
+
+            reader.on("DeviceConnected", () => {
+              console.log("DigitalPersona reader connected");
+              toast({
+                title: "Device Connected",
+                description: "DigitalPersona fingerprint reader is ready"
+              });
             });
-          });
 
-          reader.on("DeviceDisconnected", () => {
-            console.log("DigitalPersona reader disconnected");
-            toast({
-              title: "Device Disconnected",
-              description: "DigitalPersona fingerprint reader disconnected",
-              variant: "destructive"
+            reader.on("DeviceDisconnected", () => {
+              console.log("DigitalPersona reader disconnected");
+              toast({
+                title: "Device Disconnected",
+                description: "DigitalPersona fingerprint reader disconnected",
+                variant: "destructive"
+              });
             });
-          });
 
-          reader.on("SamplesAcquired", (event: any) => {
-            console.log("Fingerprint samples acquired:", event.samples);
-          });
+            reader.on("SamplesAcquired", (event: any) => {
+              console.log("Fingerprint samples acquired:", event.samples);
+            });
 
-          reader.on("ErrorOccurred", (err: any) => {
-            console.error("DigitalPersona reader error:", err);
-          });
+            reader.on("ErrorOccurred", (err: any) => {
+              console.error("DigitalPersona reader error:", err);
+            });
+          } else {
+            console.log("No compatible DigitalPersona reader found");
+          }
+        } else {
+          console.log("DigitalPersona SDK not found on window object");
         }
       } catch (error) {
         console.log("DigitalPersona SDK not available, will use alternative methods");
