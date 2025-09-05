@@ -1,4 +1,4 @@
--- Add blacklist functionality to students table
+--Blacklist functionality
 ALTER TABLE public.students 
 ADD COLUMN blacklisted BOOLEAN DEFAULT FALSE,
 ADD COLUMN blacklist_until TIMESTAMP WITH TIME ZONE,
@@ -9,7 +9,7 @@ ALTER TABLE public.books
 ADD COLUMN due_period_value INTEGER DEFAULT 24,
 ADD COLUMN due_period_unit TEXT DEFAULT 'hours' CHECK (due_period_unit IN ('hours', 'days', 'weeks', 'months', 'years'));
 
--- Create library settings table for default configurations
+--Library settings table for default configurations
 CREATE TABLE public.library_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   setting_key TEXT UNIQUE NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE public.library_settings (
 -- Enable RLS on library_settings
 ALTER TABLE public.library_settings ENABLE ROW LEVEL SECURITY;
 
--- Create policy for library_settings (admins only)
+--Policy for library_settings (admins only)
 CREATE POLICY "Only admins can manage library settings" 
 ON public.library_settings 
 FOR ALL 
@@ -33,7 +33,7 @@ INSERT INTO public.library_settings (setting_key, setting_value) VALUES
 ('default_due_period_unit', 'hours'),
 ('blacklist_duration_days', '14');
 
--- Create function to automatically blacklist overdue students
+--Function to automatically blacklist overdue students
 CREATE OR REPLACE FUNCTION public.auto_blacklist_overdue_students()
 RETURNS void
 LANGUAGE plpgsql

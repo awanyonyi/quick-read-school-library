@@ -1,6 +1,4 @@
-
--- First, let's see what categories currently exist and update them
--- We'll add a check constraint to ensure only valid categories are allowed
+-- Standardize and constrain book categories
 ALTER TABLE public.books 
 DROP CONSTRAINT IF EXISTS books_category_check;
 
@@ -8,8 +6,7 @@ ALTER TABLE public.books
 ADD CONSTRAINT books_category_check 
 CHECK (category IN ('Science', 'Language', 'Technicals and Applied', 'Humanities', 'Maths'));
 
--- Update any existing books with old categories to map them to the new ones
--- This is a best-effort mapping based on common categorizations
+
 UPDATE public.books 
 SET category = CASE 
     WHEN category ILIKE '%science%' OR category ILIKE '%chemistry%' OR category ILIKE '%biology%' OR category ILIKE '%physics%' THEN 'Science'
