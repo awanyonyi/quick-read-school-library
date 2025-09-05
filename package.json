@@ -11,12 +11,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@digitalpersona/authentication": "^0.2.6",
-    "@digitalpersona/card": "^2.0.2",
-    "@digitalpersona/core": "^0.2.6",
-    "@digitalpersona/devices": "^0.2.6",
-    "@digitalpersona/enrollment": "^0.2.9",
-    "@digitalpersona/fingerprint": "^1.0.0",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
