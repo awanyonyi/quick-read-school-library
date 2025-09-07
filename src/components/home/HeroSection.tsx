@@ -28,30 +28,30 @@ const HeroSection = ({ onShowLogin }: HeroSectionProps) => {
         <img
           src={schoolImages[currentImageIndex]}
           alt="Maryland Secondary School"
-          className="w-full h-96 object-cover transition-opacity duration-1000"
+          className="w-full h-64 sm:h-80 lg:h-96 object-cover transition-opacity duration-1000"
         />
         <div className="absolute inset-0 bg-black bg-opacity-40"></div>
       </div>
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-24">
         <div className="text-center">
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 animate-fade-in">
+          <h1 className="text-2xl sm:text-4xl lg:text-6xl font-bold text-white mb-4 sm:mb-6 animate-fade-in leading-tight">
             Welcome to Maryland Senior School
           </h1>
-          <p className="text-xl md:text-2xl text-white mb-8 max-w-3xl mx-auto">
+          <p className="text-base sm:text-xl lg:text-2xl text-white mb-6 sm:mb-8 max-w-3xl mx-auto px-2">
             School of Winners - Located in the heart of Subukia Sub-County, Nakuru County
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4 sm:px-0">
             <Button
               size="lg"
               onClick={onShowLogin}
-              className="bg-primary hover:bg-primary/80 text-primary-foreground text-lg px-8 py-3"
+              className="bg-primary hover:bg-primary/80 text-primary-foreground text-sm sm:text-lg px-6 sm:px-8 py-2 sm:py-3 w-full sm:w-auto"
             >
               Access Library System
             </Button>
             <Button
               size="lg"
               variant="outline"
-              className="bg-white/10 border-white text-white hover:bg-white hover:text-primary text-lg px-8 py-3"
+              className="bg-white/10 border-white text-white hover:bg-white hover:text-primary text-sm sm:text-lg px-6 sm:px-8 py-2 sm:py-3 w-full sm:w-auto"
             >
               Learn More
             </Button>
