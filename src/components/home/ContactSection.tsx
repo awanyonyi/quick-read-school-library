@@ -4,11 +4,11 @@ import { MapPin, Phone, Mail, Clock } from 'lucide-react';
 
 const ContactSection = () => {
   return (
-    <section className="py-16 bg-gray-50">
+    <section className="py-8 sm:py-12 lg:py-16 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid md:grid-cols-2 gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12">
           <div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">Visit Our School</h3>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Visit Our School</h3>
             <div className="space-y-4">
               <div className="flex items-start space-x-3">
                 <MapPin className="h-5 w-5 text-primary mt-1" />
@@ -42,8 +42,8 @@ const ContactSection = () => {
           </div>
           
           <div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">Library Services</h3>
-            <div className="bg-white p-6 rounded-lg shadow-sm">
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Library Services</h3>
+            <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
               <ul className="space-y-3">
                 <li className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-primary rounded-full"></div>
