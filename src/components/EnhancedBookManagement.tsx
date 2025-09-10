@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Plus, Edit, Trash2, Book, Clock } from 'lucide-react';
+import { Plus, Edit, Trash2, Book, Clock, FileSpreadsheet } from 'lucide-react';
+import BookExcelManager from './BookExcelManager';
 import { Book as BookType } from '@/types';
 import { fetchBooks, addBook } from '@/utils/libraryData';
 import { useToast } from '@/hooks/use-toast';
@@ -51,6 +52,7 @@ export default function EnhancedBookManagement({ onUpdate }: EnhancedBookManagem
   const [books, setBooks] = useState<BookType[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingBook, setEditingBook] = useState<BookType | null>(null);
+  const [showExcelManager, setShowExcelManager] = useState(false);
   const [isbnMode, setIsbnMode] = useState<'auto' | 'manual'>('auto');
   const [formData, setFormData] = useState({
     title: '',
@@ -167,11 +169,19 @@ export default function EnhancedBookManagement({ onUpdate }: EnhancedBookManagem
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Enhanced Book Management</h2>
           <p className="text-gray-600">Add books with flexible due periods and ISBN options</p>
         </div>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowExcelManager(!showExcelManager)}
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Excel Import/Export
+          </Button>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => setIsAddDialogOpen(true)}>
@@ -314,7 +324,16 @@ export default function EnhancedBookManagement({ onUpdate }: EnhancedBookManagem
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      {/* Excel Manager Section */}
+      {showExcelManager && (
+        <BookExcelManager onUploadComplete={() => {
+          loadBooks();
+          onUpdate();
+        }} />
+      )}
 
       {Object.keys(groupedBooks).length === 0 ? (
         <Card>
