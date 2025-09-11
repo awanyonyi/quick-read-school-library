@@ -24,17 +24,17 @@ export const BiometricVerification: React.FC<BiometricVerificationProps> = ({
   const [verificationStep, setVerificationStep] = useState<'start' | 'verifying' | 'success'>('start');
   const [verifiedStudent, setVerifiedStudent] = useState<Student | null>(null);
 
+  // ES6: Enhanced error handling with destructuring and optional chaining
   const handleVerificationSuccess = async (verificationData: string) => {
     try {
-      // Parse the verification response from BiometricAuth
       const parsedData = JSON.parse(verificationData);
+      const { success, studentId, message } = parsedData;
       
-      if (parsedData.success && parsedData.studentId) {
-        // Fetch full student details
+      if (success && studentId) {
         const { data: student, error } = await supabase
           .from('students')
           .select('*')
-          .eq('id', parsedData.studentId)
+          .eq('id', studentId)
           .single();
 
         if (error) {
@@ -44,25 +44,33 @@ export const BiometricVerification: React.FC<BiometricVerificationProps> = ({
         }
 
         if (student) {
-          setVerifiedStudent(student);
-          setVerificationStep('success');
+          // ES6: Array of state update actions
+          const successActions = [
+            () => setVerifiedStudent(student),
+            () => setVerificationStep('success'),
+            () => toast({
+              title: "Verification Successful",
+              description: `Identity verified for ${student.name}`
+            })
+          ];
           
-          toast({
-            title: "Verification Successful",
-            description: `Identity verified for ${student.name}`
-          });
+          successActions.forEach(action => action());
 
-          // Pass the verified student to parent component
+          // ES6: Array of cleanup actions with arrow functions
+          const cleanupActions = [
+            () => onVerificationSuccess(student),
+            () => onClose(),
+            () => resetVerification()
+          ];
+          
           setTimeout(() => {
-            onVerificationSuccess(student);
-            onClose();
-            resetVerification();
+            cleanupActions.forEach(action => action());
           }, 2000);
         } else {
           onVerificationError('Student not found');
         }
       } else {
-        onVerificationError(parsedData.message || 'Biometric verification failed');
+        onVerificationError(message ?? 'Biometric verification failed');
       }
     } catch (error: any) {
       console.error('Verification error:', error);

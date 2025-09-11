@@ -24,43 +24,49 @@ export const BiometricEnrollment: React.FC<BiometricEnrollmentProps> = ({
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [enrollmentStep, setEnrollmentStep] = useState<'start' | 'enrolling' | 'complete'>('start');
 
+  // ES6: Enhanced async/await with destructuring and arrow functions
   const handleEnrollmentSuccess = async (biometricData: string) => {
     setIsEnrolling(true);
     
     try {
       const biometricInfo = JSON.parse(biometricData);
       
-      // Update student record with biometric data
+      // ES6: Object property shorthand
+      const updateData = {
+        biometric_enrolled: true,
+        biometric_id: biometricInfo.biometricId,
+        biometric_data: biometricInfo
+      };
+      
       const { error } = await supabase
         .from('students')
-        .update({
-          biometric_enrolled: true,
-          biometric_id: biometricInfo.biometricId,
-          biometric_data: biometricInfo
-        })
+        .update(updateData)
         .eq('id', studentId);
 
       if (error) throw error;
 
-      setEnrollmentStep('complete');
-      onEnrollmentComplete();
+      // ES6: Array of completion actions
+      const completionActions = [
+        () => setEnrollmentStep('complete'),
+        () => onEnrollmentComplete(),
+        () => toast({
+          title: "Enrollment Complete",
+          description: `Biometric data enrolled successfully for ${studentName}`
+        })
+      ];
       
-      toast({
-        title: "Enrollment Complete",
-        description: `Biometric data enrolled successfully for ${studentName}`
-      });
+      completionActions.forEach(action => action());
 
-      // Auto-close after success
+      // ES6: Arrow function in setTimeout
       setTimeout(() => {
-        onClose();
-        setEnrollmentStep('start');
+        [onClose, () => setEnrollmentStep('start')].forEach(fn => fn());
       }, 2000);
 
     } catch (error: any) {
       console.error('Error saving biometric data:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to save biometric data",
+        description: error?.message ?? "Failed to save biometric data",
         variant: "destructive"
       });
     } finally {

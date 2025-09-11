@@ -7,6 +7,7 @@ export const isOverdue = (dueDate: string): boolean => {
   return now > due;
 };
 
+// ES6: Enhanced function with Map for better performance and readability
 export const calculateDueDate = (
   borrowDate: string,
   duePeriodValue: number = 24,
@@ -14,24 +15,21 @@ export const calculateDueDate = (
 ): string => {
   const borrow = new Date(borrowDate);
   
-  switch (duePeriodUnit) {
-    case 'hours':
-      borrow.setHours(borrow.getHours() + duePeriodValue);
-      break;
-    case 'days':
-      borrow.setDate(borrow.getDate() + duePeriodValue);
-      break;
-    case 'weeks':
-      borrow.setDate(borrow.getDate() + (duePeriodValue * 7));
-      break;
-    case 'months':
-      borrow.setMonth(borrow.getMonth() + duePeriodValue);
-      break;
-    case 'years':
-      borrow.setFullYear(borrow.getFullYear() + duePeriodValue);
-      break;
-    default:
-      borrow.setHours(borrow.getHours() + 24); // fallback to 24 hours
+  // ES6: Map for cleaner switch-case alternative
+  const timeOperations = new Map([
+    ['hours', () => borrow.setHours(borrow.getHours() + duePeriodValue)],
+    ['days', () => borrow.setDate(borrow.getDate() + duePeriodValue)],
+    ['weeks', () => borrow.setDate(borrow.getDate() + (duePeriodValue * 7))],
+    ['months', () => borrow.setMonth(borrow.getMonth() + duePeriodValue)],
+    ['years', () => borrow.setFullYear(borrow.getFullYear() + duePeriodValue)]
+  ]);
+  
+  // ES6: Optional execution with fallback
+  const operation = timeOperations.get(duePeriodUnit);
+  if (operation) {
+    operation();
+  } else {
+    borrow.setHours(borrow.getHours() + 24); // fallback to 24 hours
   }
   
   return borrow.toISOString();
@@ -84,6 +82,7 @@ export const fetchBorrowRecords = async () => {
   return data || [];
 };
 
+// ES6: Enhanced function with destructuring and default parameters
 export const addBook = async (bookData: {
   title: string;
   author: string;
@@ -93,14 +92,26 @@ export const addBook = async (bookData: {
   due_period_value?: number;
   due_period_unit?: string;
 }) => {
+  // ES6: Destructuring with default values
+  const { 
+    total_copies, 
+    due_period_value = 24, 
+    due_period_unit = 'hours',
+    ...otherData 
+  } = bookData;
+  
+  // ES6: Object property shorthand and spread
+  const insertData = {
+    ...otherData,
+    total_copies,
+    available_copies: total_copies,
+    due_period_value,
+    due_period_unit
+  };
+
   const { data, error } = await supabase
     .from('books')
-    .insert([{
-      ...bookData,
-      available_copies: bookData.total_copies,
-      due_period_value: bookData.due_period_value || 24,
-      due_period_unit: bookData.due_period_unit || 'hours'
-    }])
+    .insert([insertData])
     .select()
     .single();
   
@@ -158,7 +169,8 @@ export const createBorrowRecord = async (recordData: {
     throw overdueError;
   }
 
-  if (overdueRecords && overdueRecords.length > 0) {
+  // ES6: Array methods for cleaner validation
+  if (overdueRecords?.length > 0) {
     throw new Error('Student has overdue books and cannot borrow until they are returned and blacklist is cleared by admin');
   }
 
@@ -174,9 +186,13 @@ export const createBorrowRecord = async (recordData: {
     throw studentError;
   }
 
-  if (student.blacklisted) {
-    const blacklistUntil = student.blacklist_until ? new Date(student.blacklist_until) : null;
-    if (!blacklistUntil || blacklistUntil > new Date()) {
+  // ES6: Destructuring and optional chaining for blacklist validation
+  const { blacklisted, blacklist_until } = student;
+  if (blacklisted) {
+    const blacklistUntil = blacklist_until ? new Date(blacklist_until) : null;
+    const isCurrentlyBlacklisted = !blacklistUntil || blacklistUntil > new Date();
+    
+    if (isCurrentlyBlacklisted) {
       throw new Error('Student is currently blacklisted and cannot borrow books until cleared by admin');
     }
   }

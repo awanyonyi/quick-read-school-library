@@ -36,25 +36,23 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
           }
         });
 
-        // Check for DigitalPersona SDK in multiple ways
-        const dpSDK = (window as any).DPWebSDK || 
-                      (window as any).dpWebSDK || 
-                      (window as any).DigitalPersona ||
-                      (window as any).DPFP;
+        // ES6: Array destructuring and find() for SDK detection
+        const sdkNames = ['DPWebSDK', 'dpWebSDK', 'DigitalPersona', 'DPFP'];
+        const dpSDK = sdkNames.map(name => (window as any)[name]).find(Boolean);
         
         console.log("Checking for DigitalPersona SDK:", !!dpSDK);
         
         if (dpSDK) {
-          let reader;
+          // ES6: Array of initialization methods with find()
+          const initMethods = [
+            () => dpSDK.FingerprintReader && new dpSDK.FingerprintReader(),
+            () => dpSDK.createFingerprintReader && dpSDK.createFingerprintReader(),
+            () => dpSDK.WebSdk?.FingerprintReader && new dpSDK.WebSdk.FingerprintReader()
+          ];
           
-          // Try different initialization methods
-          if (dpSDK.FingerprintReader) {
-            reader = new dpSDK.FingerprintReader();
-          } else if (dpSDK.createFingerprintReader) {
-            reader = dpSDK.createFingerprintReader();
-          } else if (dpSDK.WebSdk && dpSDK.WebSdk.FingerprintReader) {
-            reader = new dpSDK.WebSdk.FingerprintReader();
-          }
+          const reader = initMethods.map(method => {
+            try { return method(); } catch { return null; }
+          }).find(Boolean);
           
           if (reader) {
             console.log("DigitalPersona reader initialized successfully");
@@ -107,35 +105,39 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
 
   // Check if biometric authentication is supported (WebAuthn or DigitalPersona)
   const isBiometricSupported = () => {
-    // Check for DigitalPersona SDK and drivers
-    if (window.DPWebSDK || window.dpWebSDK) {
+    // ES6: Use Array.includes() for cleaner SDK detection
+    const sdkProperties = ['DPWebSDK', 'dpWebSDK'];
+    const hasSDK = sdkProperties.some(prop => window[prop]);
+    
+    if (hasSDK) {
       return true;
     }
     
     // Check for DigitalPersona ActiveX controls (legacy support)
     try {
       const activeXControl = new ActiveXObject("DPFPCtl.DPFPControl");
-      if (activeXControl) {
-        return true;
-      }
+      return Boolean(activeXControl);
     } catch (e) {
       // ActiveX not available, continue checking
     }
     
+    // ES6: Destructuring and logical operators for WebAuthn check
+    const { PublicKeyCredential } = window;
+    const { credentials } = navigator;
+    
     // Check for WebAuthn with proper permission handling
-    if (window.PublicKeyCredential && navigator.credentials) {
-      // Check if we're in a secure context
-      if (!window.isSecureContext) {
-        return false;
-      }
+    if (PublicKeyCredential && credentials && window.isSecureContext) {
       return true;
     }
     
     return false;
   };
 
+  // ES6: Template literals and modern string methods
   const generateBiometricId = () => {
-    return `bio_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 11);
+    return `bio_${timestamp}_${randomString}`;
   };
 
   const enrollBiometric = async () => {
@@ -339,17 +341,9 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
           fingerprintReader.stopAcquisition()
             .then(() => {
               try {
-                // Extract template data - handle different SDK response formats
-                let templateData;
-                if (sample.Data) {
-                  templateData = sample.Data;
-                } else if (sample.template) {
-                  templateData = sample.template;
-                } else if (sample.raw) {
-                  templateData = sample.raw;
-                } else {
-                  templateData = sample;
-                }
+                // ES6: Destructuring with default values for template extraction
+                const { Data, template, raw } = sample;
+                const templateData = Data || template || raw || sample;
                 
                 // Convert to base64 for storage
                 const base64Template = typeof templateData === 'string' 
@@ -381,11 +375,11 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
           // You can add UI feedback here for quality
         });
         
-        // Start fingerprint capture with optimal settings
+        // ES6: Object property shorthand and optional chaining
         const captureSettings = {
-          format: dpSDK.SampleFormat?.PngImage || 'PngImage',
+          format: dpSDK.SampleFormat?.PngImage ?? 'PngImage',
           resolution: 500, // Standard resolution
-          compression: dpSDK.CompressionAlgorithm?.None || 'None'
+          compression: dpSDK.CompressionAlgorithm?.None ?? 'None'
         };
         
         console.log('Starting fingerprint capture with settings:', captureSettings);
@@ -413,8 +407,9 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
     setIsProcessing(true);
     
     try {
-      // Try DigitalPersona first for hardware-based verification
-      if (window.DPWebSDK || window.dpWebSDK) {
+      // ES6: Array includes for SDK detection
+      const dpSdkAvailable = ['DPWebSDK', 'dpWebSDK'].some(sdk => window[sdk]);
+      if (dpSdkAvailable) {
         await verifyDigitalPersona();
         return;
       }
@@ -432,24 +427,30 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
         throw new Error(error.message);
       }
 
-      if (data && data.length > 0 && data[0].success) {
-        const studentData = data[0];
+      // ES6: Optional chaining and destructuring
+      const [firstResult] = data || [];
+      
+      if (firstResult?.success) {
+        const { student_id, student_name, admission_number } = firstResult;
         
-        onAuthSuccess(JSON.stringify({
+        const successData = {
           success: true,
-          studentId: studentData.student_id,
-          studentName: studentData.student_name,
-          admissionNumber: studentData.admission_number,
+          studentId: student_id,
+          studentName: student_name,
+          admissionNumber: admission_number,
           verifiedAt: new Date().toISOString(),
           authType
-        }));
+        };
         
+        onAuthSuccess(JSON.stringify(successData));
+        
+        const authTypeName = authType === 'fingerprint' ? 'Fingerprint' : 'Face';
         toast({
           title: "Success",
-          description: `${authType === 'fingerprint' ? 'Fingerprint' : 'Face'} verified successfully`
+          description: `${authTypeName} verified successfully`
         });
       } else {
-        throw new Error(data?.[0]?.message || 'Biometric verification failed');
+        throw new Error(firstResult?.message ?? 'Biometric verification failed');
       }
     } catch (error: any) {
       console.error('Biometric verification error:', error);
@@ -475,8 +476,10 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
     try {
       console.log('Starting DigitalPersona verification...');
       
-      // Check for DigitalPersona SDK availability
-      const dpSDK = window.DPWebSDK || window.dpWebSDK;
+      // ES6: Destructuring for SDK detection
+      const { DPWebSDK, dpWebSDK } = window;
+      const dpSDK = DPWebSDK || dpWebSDK;
+      
       if (!dpSDK) {
         throw new Error('DigitalPersona SDK not found. Please ensure DigitalPersona software is running.');
       }

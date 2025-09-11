@@ -23,8 +23,10 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
   const [uploadResults, setUploadResults] = useState<UploadResult | null>(null);
   const { toast } = useToast();
 
+  // ES6: Arrow function with template literals and destructuring
   const downloadTemplate = () => {
-    const template = [
+    // ES6: Array of objects with consistent structure
+    const templateBooks = [
       {
         Title: 'The Great Gatsby',
         Author: 'F. Scott Fitzgerald',
@@ -43,7 +45,8 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
       }
     ];
 
-    const worksheet = XLSX.utils.json_to_sheet(template);
+    // ES6: Destructuring and method chaining
+    const worksheet = XLSX.utils.json_to_sheet(templateBooks);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Books Template');
     
@@ -69,23 +72,26 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
     try {
       const books = await fetchBooks();
       
-      // Group books by title and author, then aggregate data
+      // ES6: Enhanced grouping with destructuring and default values
       const groupedBooks = books.reduce((acc, book) => {
-        const key = `${book.title}-${book.author}`;
+        const { title, author, category, due_period_value = 24, due_period_unit = 'hours' } = book;
+        const key = `${title}-${author}`;
+        
         if (!acc[key]) {
           acc[key] = {
-            Title: book.title,
-            Author: book.author,
-            Category: book.category,
+            Title: title,
+            Author: author,
+            Category: category,
             'Total Copies': 0,
-            'Due Period Value': book.due_period_value || 24,
-            'Due Period Unit': book.due_period_unit || 'hours'
+            'Due Period Value': due_period_value,
+            'Due Period Unit': due_period_unit
           };
         }
         acc[key]['Total Copies']++;
         return acc;
       }, {} as Record<string, any>);
 
+      // ES6: Object.values for clean array extraction
       const exportData = Object.values(groupedBooks);
 
       if (exportData.length === 0) {
@@ -127,14 +133,22 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
     }
   };
 
+  // ES6: Enhanced ISBN generation with Set and template literals
   const generateUniqueISBN = (existingBooks: Book[]): string => {
-    const existingISBNs = new Set(existingBooks.map(book => book.isbn).filter(Boolean));
-    let isbn: string;
+    // ES6: Set for O(1) lookup performance and filter for clean data
+    const existingISBNs = new Set(existingBooks.map(({ isbn }) => isbn).filter(Boolean));
     
-    do {
+    // ES6: Arrow function for ISBN generation
+    const createISBN = () => {
       const timestamp = Date.now().toString();
       const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      isbn = `978${timestamp.slice(-6)}${random}`;
+      return `978${timestamp.slice(-6)}${random}`;
+    };
+    
+    // ES6: Generate unique ISBN using do-while with arrow function
+    let isbn: string;
+    do {
+      isbn = createISBN();
     } while (existingISBNs.has(isbn));
     
     return isbn;
@@ -162,26 +176,30 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
         const row = jsonData[i] as any;
         const rowNum = i + 2; // Excel row number (1-indexed + header)
 
-        // Validate required fields
-        if (!row.Title || typeof row.Title !== 'string' || row.Title.trim() === '') {
-          errors.push(`Row ${rowNum}: Title is required`);
+        // ES6: Enhanced validation with destructuring and array methods
+        const { Title, Author, Category } = row;
+        
+        // ES6: Array of validation rules for cleaner validation
+        const requiredFields = [
+          { field: Title, name: 'Title' },
+          { field: Author, name: 'Author' },
+          { field: Category, name: 'Category' }
+        ];
+        
+        // ES6: Find first invalid field
+        const invalidField = requiredFields.find(({ field }) => 
+          !field || typeof field !== 'string' || field.trim() === ''
+        );
+        
+        if (invalidField) {
+          errors.push(`Row ${rowNum}: ${invalidField.name} is required`);
           continue;
         }
 
-        if (!row.Author || typeof row.Author !== 'string' || row.Author.trim() === '') {
-          errors.push(`Row ${rowNum}: Author is required`);
-          continue;
-        }
-
-        if (!row.Category || typeof row.Category !== 'string' || row.Category.trim() === '') {
-          errors.push(`Row ${rowNum}: Category is required`);
-          continue;
-        }
-
-        // Validate category against allowed values
-        const allowedCategories = ['Science', 'Language', 'Technicals and Applied', 'Humanities', 'Maths'];
-        if (!allowedCategories.includes(row.Category.trim())) {
-          errors.push(`Row ${rowNum}: Category must be one of: ${allowedCategories.join(', ')}`);
+        // ES6: Set for O(1) lookup of allowed categories
+        const allowedCategories = new Set(['Science', 'Language', 'Technicals and Applied', 'Humanities', 'Maths']);
+        if (!allowedCategories.has(Category.trim())) {
+          errors.push(`Row ${rowNum}: Category must be one of: ${Array.from(allowedCategories).join(', ')}`);
           continue;
         }
 
@@ -192,13 +210,14 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
           continue;
         }
 
-        // Validate due period
+        // ES6: Enhanced due period validation with destructuring and Set
         const duePeriodValue = parseInt(row['Due Period Value']) || 24;
         const duePeriodUnit = row['Due Period Unit'] || 'hours';
         
-        const allowedUnits = ['hours', 'days', 'weeks', 'months', 'years'];
-        if (!allowedUnits.includes(duePeriodUnit)) {
-          errors.push(`Row ${rowNum}: Due Period Unit must be one of: ${allowedUnits.join(', ')}`);
+        // ES6: Set for allowed units validation
+        const allowedUnits = new Set(['hours', 'days', 'weeks', 'months', 'years']);
+        if (!allowedUnits.has(duePeriodUnit)) {
+          errors.push(`Row ${rowNum}: Due Period Unit must be one of: ${Array.from(allowedUnits).join(', ')}`);
           continue;
         }
 
