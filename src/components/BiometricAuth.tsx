@@ -14,9 +14,47 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
   onAuthError,
 }) => {
   const [status, setStatus] = useState<string>("Initializing device...");
-  const [reader] = useState(() => new (window as any).Fingerprint.WebApi());
+  const [reader, setReader] = useState<any>(null);
+  const [sdkLoaded, setSdkLoaded] = useState<boolean>(false);
 
+  // Check if SDK is loaded
   useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 20; // Stop after 10 seconds (20 * 500ms)
+
+    const checkSdkAvailability = () => {
+      const win = window as any;
+      if (win.Fingerprint && win.Fingerprint.WebApi) {
+        setSdkLoaded(true);
+        setStatus("SDK loaded. Initializing device...");
+        try {
+          const newReader = new win.Fingerprint.WebApi();
+          setReader(newReader);
+        } catch (err) {
+          console.error("Failed to create WebApi instance:", err);
+          setStatus("Failed to initialize biometric device.");
+          onAuthError("Failed to initialize biometric device.");
+        }
+      } else {
+        retryCount++;
+        if (retryCount >= maxRetries) {
+          setStatus("Biometric SDK failed to load. Please refresh the page.");
+          onAuthError("Biometric SDK not available. Please ensure the device drivers are installed.");
+          return;
+        }
+        setStatus("Waiting for biometric SDK to load...");
+        // Retry after a short delay
+        setTimeout(checkSdkAvailability, 500);
+      }
+    };
+
+    checkSdkAvailability();
+  }, [onAuthError]);
+
+  // Initialize device when reader is available
+  useEffect(() => {
+    if (!reader || !sdkLoaded) return;
+
     // Listen for device connections
     reader.onDeviceConnected = (device) => {
       console.log("Fingerprint reader connected:", device);
@@ -29,8 +67,9 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
     };
 
     // Start acquisition when mounted
+    const win = window as any;
     reader
-      .startAcquisition((window as any).Fingerprint.SampleFormat.PngImage)
+      .startAcquisition(win.Fingerprint.SampleFormat.PngImage)
       .then(() => setStatus("Place your finger on the scanner"))
       .catch((err) => {
         console.error("Device acquisition error:", err);
@@ -62,7 +101,7 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
     return () => {
       reader.stopAcquisition().catch(() => {});
     };
-  }, [mode, studentId, onAuthSuccess, onAuthError, reader]);
+  }, [mode, studentId, onAuthSuccess, onAuthError, reader, sdkLoaded]);
 
   return (
     <div className="text-center space-y-3">
