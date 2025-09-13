@@ -37,16 +37,56 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
         WebSdk: !!win.WebSdk
       });
 
-      if (win.Fingerprint && win.Fingerprint.WebApi) {
-        console.log("✅ Fingerprint SDK detected!");
+      // Check for available SDK objects
+      const sdkAvailable = !!(
+        (win.Fingerprint && win.Fingerprint.WebApi) ||
+        win.DPWebSDK ||
+        win.dpWebSDK ||
+        win.DigitalPersona ||
+        win.DPFP ||
+        win.WebSdk
+      );
+
+      if (sdkAvailable) {
+        console.log("✅ SDK detected!");
         setSdkLoaded(true);
         setStatus("SDK loaded. Initializing device...");
+
         try {
-          const newReader = new win.Fingerprint.WebApi();
-          console.log("✅ WebApi instance created successfully");
+          let newReader;
+
+          // Debug: Log available SDK properties
+          console.log("SDK Properties Debug:", {
+            Fingerprint: win.Fingerprint ? Object.keys(win.Fingerprint) : 'undefined',
+            WebSdk: win.WebSdk ? Object.keys(win.WebSdk) : 'undefined',
+            DPWebSDK: win.DPWebSDK ? Object.keys(win.DPWebSDK) : 'undefined'
+          });
+
+          // Try different SDK initialization methods
+          if (win.Fingerprint?.WebApi) {
+            console.log("✅ Using Fingerprint.WebApi");
+            newReader = new win.Fingerprint.WebApi();
+            console.log("Reader methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(newReader)));
+          } else if (win.DPWebSDK) {
+            console.log("✅ Using DPWebSDK");
+            // Handle DPWebSDK initialization
+            newReader = win.DPWebSDK;
+          } else if (win.WebSdk) {
+            console.log("✅ Using WebSdk");
+            // Handle WebSdk initialization - WebSdk might be a constructor or factory
+            if (typeof win.WebSdk === 'function') {
+              newReader = new win.WebSdk();
+            } else {
+              newReader = win.WebSdk;
+            }
+          } else {
+            throw new Error("No compatible SDK initialization method found");
+          }
+
+          console.log("✅ SDK instance created successfully");
           setReader(newReader);
         } catch (err) {
-          console.error("❌ Failed to create WebApi instance:", err);
+          console.error("❌ Failed to create SDK instance:", err);
           setStatus("Failed to initialize biometric device.");
           onAuthError("Failed to initialize biometric device.");
         }
@@ -93,8 +133,20 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
 
     // Start acquisition when mounted
     const win = window as any;
+
+    // Determine the correct sample format
+    let sampleFormat = 0; // Default to PngImage (0)
+    if (win.Fingerprint?.SampleFormat?.PngImage !== undefined) {
+      sampleFormat = win.Fingerprint.SampleFormat.PngImage;
+    } else if (win.Fingerprint?.SampleFormat !== undefined && typeof win.Fingerprint.SampleFormat === 'object') {
+      // Try to find PngImage in the SampleFormat object
+      sampleFormat = win.Fingerprint.SampleFormat.PngImage || win.Fingerprint.SampleFormat.PNG || 0;
+    }
+
+    console.log("Using sample format:", sampleFormat);
+
     reader
-      .startAcquisition(win.Fingerprint.SampleFormat.PngImage)
+      .startAcquisition(sampleFormat)
       .then(() => setStatus("Place your finger on the scanner"))
       .catch((err) => {
         console.error("Device acquisition error:", err);
@@ -105,7 +157,91 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
     // Subscribe to samples
     reader.onSamplesAcquired = (samples) => {
       try {
-        const fingerprintImage = samples[0].Data; // Base64-encoded PNG
+        console.log("Samples received:", samples);
+        console.log("Samples type:", typeof samples);
+        console.log("Samples is array:", Array.isArray(samples));
+
+        // Handle different sample formats
+        let fingerprintImage;
+
+        if (typeof samples === 'string') {
+          // Handle string format (like "t" or base64 data)
+          if (samples.length > 10) {
+            // Likely base64 encoded image data
+            fingerprintImage = samples;
+            console.log("✅ Using direct string format (base64 data)");
+          } else {
+            // Short string, might be status message
+            console.log("Received status message:", samples);
+            setStatus(`Device status: ${samples}`);
+            return; // Don't process as fingerprint data
+          }
+        } else if (Array.isArray(samples) && samples.length > 0) {
+          // Handle array format
+          const firstSample = samples[0];
+          console.log("First sample structure:", firstSample);
+
+          if (firstSample?.Data) {
+            fingerprintImage = firstSample.Data;
+            console.log("✅ Using samples[0].Data format");
+          } else if (firstSample?.data) {
+            fingerprintImage = firstSample.data;
+            console.log("✅ Using samples[0].data format");
+          } else if (typeof firstSample === 'string') {
+            fingerprintImage = firstSample;
+            console.log("✅ Using samples[0] as string");
+          } else if (firstSample && typeof firstSample === 'object') {
+            const possibleKeys = ['Data', 'data', 'image', 'fingerprint', 'png', 'base64'];
+            for (const key of possibleKeys) {
+              if (firstSample[key]) {
+                fingerprintImage = firstSample[key];
+                console.log(`✅ Found data in samples[0].${key}`);
+                break;
+              }
+            }
+          }
+
+          if (!fingerprintImage) {
+            console.error("Available sample properties:", Object.keys(firstSample || {}));
+            throw new Error("Could not extract fingerprint data from sample array");
+          }
+        } else if (samples && typeof samples === 'object' && !Array.isArray(samples)) {
+          // Handle object format
+          const objectKeys = Object.keys(samples);
+          console.log("Sample object properties:", objectKeys);
+          console.log("Sample object values:", samples);
+
+          // Try all possible keys that might contain data
+          const possibleKeys = ['Data', 'data', 'image', 'fingerprint', 'png', 'base64', 'content', 'value', 'result', 'payload'];
+
+          for (const key of possibleKeys) {
+            if (samples[key]) {
+              fingerprintImage = samples[key];
+              console.log(`✅ Found data in samples.${key}`);
+              break;
+            }
+          }
+
+          // If no standard keys found, try the first available property
+          if (!fingerprintImage && objectKeys.length > 0) {
+            const firstKey = objectKeys[0];
+            fingerprintImage = samples[firstKey];
+            console.log(`✅ Using first available property: samples.${firstKey}`);
+          }
+
+          if (!fingerprintImage) {
+            console.error("Available object properties:", objectKeys);
+            console.error("Object values:", JSON.stringify(samples, null, 2));
+            throw new Error("Could not extract fingerprint data from sample object");
+          }
+        } else {
+          throw new Error(`Unsupported sample format: ${typeof samples}`);
+        }
+
+        if (!fingerprintImage) {
+          throw new Error("No fingerprint data found in any supported format");
+        }
+
         const biometricPayload = {
           studentId,
           biometricId: `${studentId}-${Date.now()}`,
@@ -114,11 +250,13 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
           timestamp: new Date().toISOString(),
         };
 
+        console.log("✅ Biometric payload created successfully");
         onAuthSuccess(JSON.stringify(biometricPayload));
         setStatus("Fingerprint captured successfully!");
         reader.stopAcquisition();
       } catch (err: any) {
         console.error("Sample processing error:", err);
+        console.error("Sample details:", samples);
         onAuthError(err.message || "Error processing fingerprint.");
       }
     };
@@ -133,13 +271,16 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
       <p className="text-sm text-muted-foreground">{status}</p>
       {status.includes("failed to load") && (
         <div className="text-xs text-red-600 mt-2 space-y-1">
-          <p><strong>Troubleshooting steps:</strong></p>
+          <p><strong>Troubleshooting steps for U.are.U 4500:</strong></p>
           <ul className="text-left list-disc list-inside">
-            <li>Ensure DigitalPersona drivers are installed</li>
-            <li>Check that the fingerprint reader is connected</li>
-            <li>Try refreshing the page</li>
-            <li>Restart your browser</li>
+            <li>✅ DigitalPersona drivers are installed on Windows 10</li>
+            <li>Check that the U.are.U 4500 reader is connected and powered on</li>
+            <li>Try using Chrome or Firefox (recommended for WebUSB support)</li>
+            <li>If using HTTPS, ensure proper SSL certificate configuration</li>
+            <li>Check Windows Device Manager to verify device is recognized</li>
+            <li>Try refreshing the page or restarting the browser</li>
             <li>Check browser console for detailed error messages</li>
+            <li>Ensure no other applications are using the fingerprint reader</li>
           </ul>
         </div>
       )}

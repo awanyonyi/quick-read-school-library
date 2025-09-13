@@ -57,26 +57,68 @@
 <body>
   <div id="root"></div>
 
-   <!-- ✅ Load DigitalPersona SDK first so it's available before React mounts -->
-   <script src="/assets/websdk.client.bundle.min.js"></script>
+   <!-- ✅ Load DigitalPersona Fingerprint SDK first so it's available before React mounts -->
+   <script src="/DigitalReader/Test-Client/scripts/fingerprint.sdk.min.js"></script>
+   <script src="/DigitalReader/Test-Client/scripts/websdk.client.bundle.min.js"></script>
 
-   <!-- Fallback: Try to load SDK from alternative locations if primary fails -->
+   <!-- Browser compatibility and device-specific checks -->
    <script>
-     // Check if SDK loaded successfully, if not try alternative loading
-     setTimeout(() => {
-       if (!window.Fingerprint || !window.Fingerprint.WebApi) {
-         console.log("🔄 Primary SDK load failed, trying alternative locations...");
+     // Browser compatibility check for U.are.U 4500
+     function checkBrowserCompatibility() {
+       const browserInfo = {
+         chrome: /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor),
+         firefox: /Firefox/.test(navigator.userAgent),
+         edge: /Edg/.test(navigator.userAgent),
+         safari: /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent),
+         ie: /MSIE|Trident/.test(navigator.userAgent)
+       };
 
-         // Try loading from scripts directory
-         const altScript = document.createElement('script');
-         altScript.src = '/scripts/websdk.client.bundle.min.js';
-         altScript.onload = () => {
-           console.log("✅ Alternative SDK script loaded from /scripts/");
-         };
-         altScript.onerror = () => {
-           console.warn("❌ Alternative SDK script also failed to load");
-         };
-         document.head.appendChild(altScript);
+       console.log("Browser Detection:", browserInfo);
+
+       // Check for WebUSB support (important for modern fingerprint readers)
+       if ('usb' in navigator) {
+         console.log("✅ WebUSB API supported - good for U.are.U 4500");
+       } else {
+         console.warn("⚠️ WebUSB API not supported - may limit device access");
+       }
+
+       // Check for HTTPS (required for WebUSB in some browsers)
+       if (location.protocol === 'https:') {
+         console.log("✅ HTTPS enabled - required for WebUSB");
+       } else if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+         console.log("✅ Localhost detected - WebUSB works without HTTPS");
+       } else {
+         console.warn("⚠️ HTTP detected - WebUSB requires HTTPS in production");
+       }
+
+       return browserInfo;
+     }
+
+     // Check SDK loading status
+     setTimeout(() => {
+       checkBrowserCompatibility();
+
+       // Check what SDK objects are actually available
+       const sdkStatus = {
+         hasFingerprint: !!window.Fingerprint,
+         hasFingerprintWebApi: !!window.Fingerprint?.WebApi,
+         hasWebSdk: !!window.WebSdk,
+         hasDPWebSDK: !!window.DPWebSDK,
+         hasDigitalPersona: !!window.DigitalPersona
+       };
+
+       console.log("SDK Loading Status:", sdkStatus);
+
+       if (!window.Fingerprint?.WebApi && !window.WebSdk && !window.DPWebSDK) {
+         console.warn("⚠️ No compatible fingerprint SDK found");
+         console.warn("💡 For U.are.U 4500 troubleshooting:");
+         console.warn("   - Ensure device is properly connected to USB port");
+         console.warn("   - Check Windows Device Manager for device status");
+         console.warn("   - Try different USB port if available");
+         console.warn("   - Restart DigitalPersona service if installed");
+         console.warn("   - Verify the SDK file is loading correctly from /assets/");
+       } else {
+         console.log("✅ SDK objects detected, proceeding with biometric component");
        }
      }, 2000); // Wait 2 seconds for primary load
    </script>
@@ -88,10 +130,15 @@
   <!-- Bootstrap Bundle -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- ✅ Improved DigitalPersona SDK detection -->
+  <!-- ✅ Improved DigitalPersona SDK detection with U.are.U 4500 support -->
   <script>
     window.addEventListener("load", () => {
-      console.log("🔍 Checking for DigitalPersona SDK...");
+      console.log("🔍 Checking for DigitalPersona SDK (U.are.U 4500 compatible)...");
+      console.log("Browser Info:", {
+        userAgent: navigator.userAgent,
+        https: location.protocol === 'https:',
+        localhost: location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+      });
 
       // Check all possible global objects
       const checks = {
@@ -118,6 +165,15 @@
         }
       }
 
+      // Check for USB device access (modern browsers)
+      let usbAccessGranted = false;
+      if ('usb' in navigator) {
+        console.log("✅ WebUSB API available");
+        // Note: Actual USB access requires user permission
+      } else {
+        console.log("❌ WebUSB API not available");
+      }
+
       const sdkFound = !!(
         window.Fingerprint?.WebApi ||
         window.DPWebSDK ||
@@ -129,26 +185,36 @@
       );
 
       if (sdkFound) {
-        console.log("%c✅ DigitalPersona SDK detected and ready", "color:green;font-weight:bold;");
+        console.log("%c✅ SDK detected and ready", "color:green;font-weight:bold;");
 
-        // Additional validation for Fingerprint SDK
+        // Determine which SDK is available and log appropriately
         if (window.Fingerprint?.WebApi) {
           console.log("✅ Fingerprint.WebApi is available");
           try {
-            // Test if we can create an instance
             const testInstance = new window.Fingerprint.WebApi();
             console.log("✅ Fingerprint.WebApi instantiation successful");
           } catch (e) {
             console.error("❌ Fingerprint.WebApi instantiation failed:", e);
           }
+        } else if (window.WebSdk) {
+          console.log("✅ WebSdk is available (WebSocket-based SDK)");
+        } else if (window.DPWebSDK) {
+          console.log("✅ DPWebSDK is available");
+        } else {
+          console.log("✅ Alternative SDK detected");
         }
+
+        console.log("ℹ️ Device enumeration will be handled by the biometric component");
       } else {
         console.warn("⚠️ DigitalPersona SDK not found or not properly initialized");
-        console.warn("Make sure:");
-        console.warn("1. DigitalPersona drivers are installed");
-        console.warn("2. DigitalPersona Web SDK is properly installed");
-        console.warn("3. The device is connected and recognized");
-        console.warn("4. Try refreshing the page or restarting the browser");
+        console.warn("For U.are.U 4500 on Windows 10:");
+        console.warn("1. ✅ DigitalPersona drivers are installed");
+        console.warn("2. Make sure the device is connected and powered on");
+        console.warn("3. Try using Chrome or Firefox (recommended for WebUSB)");
+        console.warn("4. If using HTTPS, ensure proper SSL certificate");
+        console.warn("5. Check Windows Device Manager for device status");
+        console.warn("6. Try refreshing the page or restarting the browser");
+        console.warn("7. Check browser console for detailed error messages");
       }
     });
   </script>
