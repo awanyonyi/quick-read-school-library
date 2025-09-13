@@ -65,10 +65,15 @@ const AdminPasswordReset = () => {
         .from('admins')
         .select('username')
         .eq('id', user?.id)
-        .single();
+        .maybeSingle();
+
+      if (adminData.error) {
+        console.error('Error fetching admin:', adminData.error);
+        throw new Error('Failed to fetch admin data');
+      }
 
       if (!adminData.data) {
-        throw new Error('Admin not found');
+        throw new Error('Admin not found. Please ensure you are logged in as an admin.');
       }
 
       const { data, error } = await supabase.rpc('change_admin_password', {
