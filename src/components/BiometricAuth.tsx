@@ -24,25 +24,50 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
 
     const checkSdkAvailability = () => {
       const win = window as any;
+
+      // Debug logging
+      console.log(`🔄 SDK Check Attempt ${retryCount + 1}/${maxRetries}`);
+      console.log("Available globals:", {
+        Fingerprint: !!win.Fingerprint,
+        FingerprintWebApi: !!win.Fingerprint?.WebApi,
+        DPWebSDK: !!win.DPWebSDK,
+        dpWebSDK: !!win.dpWebSDK,
+        DigitalPersona: !!win.DigitalPersona,
+        DPFP: !!win.DPFP,
+        WebSdk: !!win.WebSdk
+      });
+
       if (win.Fingerprint && win.Fingerprint.WebApi) {
+        console.log("✅ Fingerprint SDK detected!");
         setSdkLoaded(true);
         setStatus("SDK loaded. Initializing device...");
         try {
           const newReader = new win.Fingerprint.WebApi();
+          console.log("✅ WebApi instance created successfully");
           setReader(newReader);
         } catch (err) {
-          console.error("Failed to create WebApi instance:", err);
+          console.error("❌ Failed to create WebApi instance:", err);
           setStatus("Failed to initialize biometric device.");
           onAuthError("Failed to initialize biometric device.");
         }
       } else {
         retryCount++;
         if (retryCount >= maxRetries) {
+          console.error("❌ SDK loading failed after maximum retries");
+          console.error("Available globals at failure:", {
+            Fingerprint: win.Fingerprint,
+            FingerprintWebApi: win.Fingerprint?.WebApi,
+            DPWebSDK: win.DPWebSDK,
+            dpWebSDK: win.dpWebSDK,
+            DigitalPersona: win.DigitalPersona,
+            DPFP: win.DPFP,
+            WebSdk: win.WebSdk
+          });
           setStatus("Biometric SDK failed to load. Please refresh the page.");
           onAuthError("Biometric SDK not available. Please ensure the device drivers are installed.");
           return;
         }
-        setStatus("Waiting for biometric SDK to load...");
+        setStatus(`Waiting for biometric SDK to load... (${retryCount}/${maxRetries})`);
         // Retry after a short delay
         setTimeout(checkSdkAvailability, 500);
       }
@@ -106,6 +131,18 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
   return (
     <div className="text-center space-y-3">
       <p className="text-sm text-muted-foreground">{status}</p>
+      {status.includes("failed to load") && (
+        <div className="text-xs text-red-600 mt-2 space-y-1">
+          <p><strong>Troubleshooting steps:</strong></p>
+          <ul className="text-left list-disc list-inside">
+            <li>Ensure DigitalPersona drivers are installed</li>
+            <li>Check that the fingerprint reader is connected</li>
+            <li>Try refreshing the page</li>
+            <li>Restart your browser</li>
+            <li>Check browser console for detailed error messages</li>
+          </ul>
+        </div>
+      )}
     </div>
   );
 };

@@ -60,6 +60,27 @@
    <!-- ✅ Load DigitalPersona SDK first so it's available before React mounts -->
    <script src="/assets/websdk.client.bundle.min.js"></script>
 
+   <!-- Fallback: Try to load SDK from alternative locations if primary fails -->
+   <script>
+     // Check if SDK loaded successfully, if not try alternative loading
+     setTimeout(() => {
+       if (!window.Fingerprint || !window.Fingerprint.WebApi) {
+         console.log("🔄 Primary SDK load failed, trying alternative locations...");
+
+         // Try loading from scripts directory
+         const altScript = document.createElement('script');
+         altScript.src = '/scripts/websdk.client.bundle.min.js';
+         altScript.onload = () => {
+           console.log("✅ Alternative SDK script loaded from /scripts/");
+         };
+         altScript.onerror = () => {
+           console.warn("❌ Alternative SDK script also failed to load");
+         };
+         document.head.appendChild(altScript);
+       }
+     }, 2000); // Wait 2 seconds for primary load
+   </script>
+
       <!-- ✅ Then load your React/Vite bundle -->
    <script type="module" src="/src/main.tsx"></script>
 
@@ -70,26 +91,64 @@
   <!-- ✅ Improved DigitalPersona SDK detection -->
   <script>
     window.addEventListener("load", () => {
-      console.log("Checking for DigitalPersona SDK...");
+      console.log("🔍 Checking for DigitalPersona SDK...");
+
+      // Check all possible global objects
+      const checks = {
+        'window.Fingerprint': window.Fingerprint,
+        'window.Fingerprint.WebApi': window.Fingerprint?.WebApi,
+        'window.DPWebSDK': window.DPWebSDK,
+        'window.dpWebSDK': window.dpWebSDK,
+        'window.DigitalPersona': window.DigitalPersona,
+        'window.DPFP': window.DPFP,
+        'window.WebSdk': window.WebSdk
+      };
+
+      console.log("SDK Global Objects Check:", checks);
+
+      // Check for ActiveX (IE legacy)
+      let activeXAvailable = false;
+      if (window.ActiveXObject) {
+        try {
+          new ActiveXObject("DPFPCtl.DPFPControl");
+          activeXAvailable = true;
+          console.log("✅ ActiveX DigitalPersona control available");
+        } catch (e) {
+          console.log("❌ ActiveX DigitalPersona control not available:", e.message);
+        }
+      }
+
       const sdkFound = !!(
+        window.Fingerprint?.WebApi ||
         window.DPWebSDK ||
         window.dpWebSDK ||
         window.DigitalPersona ||
         window.DPFP ||
-        (window.ActiveXObject && (() => {
-          try {
-            new ActiveXObject("DPFPCtl.DPFPControl");
-            return true;
-          } catch (e) {
-            return false;
-          }
-        })())
+        window.WebSdk ||
+        activeXAvailable
       );
 
       if (sdkFound) {
-        console.log("%c✅ DigitalPersona SDK detected", "color:green;font-weight:bold;");
+        console.log("%c✅ DigitalPersona SDK detected and ready", "color:green;font-weight:bold;");
+
+        // Additional validation for Fingerprint SDK
+        if (window.Fingerprint?.WebApi) {
+          console.log("✅ Fingerprint.WebApi is available");
+          try {
+            // Test if we can create an instance
+            const testInstance = new window.Fingerprint.WebApi();
+            console.log("✅ Fingerprint.WebApi instantiation successful");
+          } catch (e) {
+            console.error("❌ Fingerprint.WebApi instantiation failed:", e);
+          }
+        }
       } else {
-        console.warn("⚠️ DigitalPersona SDK not found. Make sure drivers and SDK are installed.");
+        console.warn("⚠️ DigitalPersona SDK not found or not properly initialized");
+        console.warn("Make sure:");
+        console.warn("1. DigitalPersona drivers are installed");
+        console.warn("2. DigitalPersona Web SDK is properly installed");
+        console.warn("3. The device is connected and recognized");
+        console.warn("4. Try refreshing the page or restarting the browser");
       }
     });
   </script>
