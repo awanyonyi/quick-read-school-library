@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Book, Student, BorrowRecord } from '../types';
-import { calculateFine, getBorrowDueDate, fetchBooks, fetchStudents, fetchBorrowRecords, createBorrowRecord, returnBook } from '../utils/libraryData';
+import { calculateFine, getBorrowDueDate, fetchBooks, fetchStudents, fetchBorrowRecords, createBorrowRecord, returnBook, logBiometricVerification } from '../utils/libraryData';
 import { Plus, BookOpen, User, Clock, CheckCircle, AlertTriangle, Search, Shield } from 'lucide-react';
 import { BiometricVerification } from './BiometricVerification';
 import { toast } from '@/hooks/use-toast';
@@ -121,9 +121,9 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
     if (!pendingIssueData) return;
 
     // Check if student already has this book
-    const existingRecord = borrowRecords.find(record => 
-      record.book_id === pendingIssueData.bookId && 
-      record.student_id === verifiedStudent.id && 
+    const existingRecord = borrowRecords.find(record =>
+      record.book_id === pendingIssueData.bookId &&
+      record.student_id === verifiedStudent.id &&
       record.status === 'borrowed'
     );
 
@@ -139,17 +139,72 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
     }
 
     try {
+      const book = books.find(b => b.id === pendingIssueData.bookId);
+      if (!book) {
+        throw new Error("Book not found");
+      }
+
       // Create borrow record with verified student
-      await createBorrowRecord({
+      const borrowRecord = await createBorrowRecord({
         book_id: pendingIssueData.bookId,
         student_id: verifiedStudent.id,
         due_period_value: pendingIssueData.borrowPeriod.value,
         due_period_unit: pendingIssueData.borrowPeriod.unit
       });
 
+      // Log biometric verification event to database
+      await logBiometricVerification({
+        student_id: verifiedStudent.id,
+        book_id: pendingIssueData.bookId,
+        verification_type: 'book_issue',
+        verification_method: 'fingerprint',
+        verification_status: 'success',
+        verified_by: 'system', // Could be librarian ID in future
+        verification_timestamp: new Date().toISOString(),
+        borrow_record_id: borrowRecord?.id || null,
+        additional_data: {
+          book_title: book.title,
+          book_author: book.author,
+          book_isbn: book.isbn,
+          student_name: verifiedStudent.name,
+          student_admission: verifiedStudent.admission_number,
+          student_class: verifiedStudent.class,
+          borrow_period: `${pendingIssueData.borrowPeriod.value} ${pendingIssueData.borrowPeriod.unit}`,
+          due_date: getBorrowDueDate(
+            new Date(),
+            pendingIssueData.borrowPeriod.value,
+            pendingIssueData.borrowPeriod.unit
+          ).toISOString()
+        }
+      });
+
+      // Enhanced success message with detailed student information
       toast({
-        title: "Success",
-        description: `Book issued successfully to ${verifiedStudent.name}`
+        title: "✅ Book Issued Successfully",
+        description: (
+          <div className="space-y-2">
+            <div className="font-semibold text-green-700">
+              📖 {book.title}
+            </div>
+            <div className="text-sm">
+              <div className="font-medium">👤 {verifiedStudent.name}</div>
+              <div className="text-gray-600">
+                Admission: {verifiedStudent.admission_number} • Class: {verifiedStudent.class}
+              </div>
+              <div className="text-gray-600">
+                Due: {getBorrowDueDate(
+                  new Date(),
+                  pendingIssueData.borrowPeriod.value,
+                  pendingIssueData.borrowPeriod.unit
+                ).toLocaleDateString()}
+              </div>
+            </div>
+            <div className="text-xs text-green-600 font-medium">
+              🔐 Biometric verification successful
+            </div>
+          </div>
+        ),
+        duration: 8000, // Show longer for detailed info
       });
 
       // Reset form

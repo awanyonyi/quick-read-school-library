@@ -338,13 +338,76 @@ export const processOverdueBooks = async () => {
   }
 };
 
+// Biometric verification logging
+export const logBiometricVerification = async (verificationData: {
+  student_id: string;
+  book_id?: string;
+  verification_type: 'book_issue' | 'book_return' | 'enrollment' | 'verification';
+  verification_method: 'fingerprint' | 'face' | 'card';
+  verification_status: 'success' | 'failed';
+  verified_by?: string;
+  verification_timestamp: string;
+  borrow_record_id?: string | null;
+  additional_data?: any;
+}) => {
+  try {
+    const { data, error } = await supabase
+      .from('biometric_verification_logs')
+      .insert([{
+        student_id: verificationData.student_id,
+        book_id: verificationData.book_id,
+        verification_type: verificationData.verification_type,
+        verification_method: verificationData.verification_method,
+        verification_status: verificationData.verification_status,
+        verified_by: verificationData.verified_by,
+        verification_timestamp: verificationData.verification_timestamp,
+        borrow_record_id: verificationData.borrow_record_id,
+        additional_data: verificationData.additional_data || {}
+      }]);
+
+    if (error) {
+      console.error('Error logging biometric verification:', error);
+      // Don't throw error to avoid breaking the main flow
+    } else {
+      console.log('✅ Biometric verification logged successfully');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in biometric verification logging:', error);
+    // Don't throw error to avoid breaking the main flow
+  }
+};
+
 // Legacy compatibility functions
 export const calculateFine = (dueDate: string): number => {
   // Return 0 since we no longer use fines
   return 0;
 };
 
-export const getBorrowDueDate = (borrowDate: string): string => {
-  // Use default 24 hours for backward compatibility
-  return calculateDueDate(borrowDate, 24, 'hours');
+export const getBorrowDueDate = (
+  borrowDate: Date | string,
+  periodValue: number = 24,
+  periodUnit: string = 'hours'
+): Date => {
+  const borrow = new Date(borrowDate);
+
+  // ES6: Map for cleaner switch-case alternative
+  const timeOperations = new Map([
+    ['hours', () => borrow.setHours(borrow.getHours() + periodValue)],
+    ['days', () => borrow.setDate(borrow.getDate() + periodValue)],
+    ['weeks', () => borrow.setDate(borrow.getDate() + (periodValue * 7))],
+    ['months', () => borrow.setMonth(borrow.getMonth() + periodValue)],
+    ['years', () => borrow.setFullYear(borrow.getFullYear() + periodValue)]
+  ]);
+
+  // ES6: Optional execution with fallback
+  const operation = timeOperations.get(periodUnit);
+  if (operation) {
+    operation();
+  } else {
+    borrow.setHours(borrow.getHours() + 24); // fallback to 24 hours
+  }
+
+  return borrow;
 };
