@@ -89,6 +89,11 @@ class ApiClient {
       body: JSON.stringify(biometricData),
     });
   }
+
+  // Get all enrolled biometric data for duplicate checking
+  async getBiometricData(): Promise<any[]> {
+    return this.request('/students/biometric-data');
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

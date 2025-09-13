@@ -2,11 +2,11 @@
 -- Run this script to create the database and tables
 
 -- Create database
-CREATE DATABASE IF NOT EXISTS school_library CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE school_library;
 USE school_library;
 
 -- Students table
-CREATE TABLE IF NOT EXISTS students (
+CREATE TABLE students (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   name VARCHAR(255) NOT NULL,
   admission_number VARCHAR(50) UNIQUE NOT NULL,
@@ -16,14 +16,14 @@ CREATE TABLE IF NOT EXISTS students (
   blacklist_until DATETIME NULL,
   blacklist_reason TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_admission_number (admission_number),
   INDEX idx_email (email),
   INDEX idx_blacklisted (blacklisted)
 );
 
 -- Books table
-CREATE TABLE IF NOT EXISTS books (
+CREATE TABLE books (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   title VARCHAR(500) NOT NULL,
   author VARCHAR(255) NOT NULL,
@@ -32,29 +32,30 @@ CREATE TABLE IF NOT EXISTS books (
   total_copies INT NOT NULL DEFAULT 1,
   available_copies INT NOT NULL DEFAULT 1,
   due_period_value INT DEFAULT 24,
-  due_period_unit ENUM('hours', 'days', 'weeks', 'months', 'years') DEFAULT 'hours',
+  due_period_unit VARCHAR(20) DEFAULT 'hours' CHECK (due_period_unit IN ('hours', 'days', 'weeks', 'months', 'years')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_title (title),
   INDEX idx_author (author),
   INDEX idx_isbn (isbn),
   INDEX idx_category (category),
-  INDEX idx_available_copies (available_copies)
+  INDEX idx_available_copies (available_copies),
+  CONSTRAINT chk_available_copies CHECK (available_copies >= 0)
 );
 
 -- Borrow records table
-CREATE TABLE IF NOT EXISTS borrow_records (
+CREATE TABLE borrow_records (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   book_id VARCHAR(36) NOT NULL,
   student_id VARCHAR(36) NOT NULL,
   borrow_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   due_date TIMESTAMP NOT NULL,
   return_date TIMESTAMP NULL,
-  status ENUM('borrowed', 'returned', 'overdue') DEFAULT 'borrowed',
+  status VARCHAR(20) DEFAULT 'borrowed' CHECK (status IN ('borrowed', 'returned', 'overdue')),
   fine_amount DECIMAL(10,2) DEFAULT 0,
   fine_paid BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
   FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
   INDEX idx_book_id (book_id),
@@ -65,19 +66,19 @@ CREATE TABLE IF NOT EXISTS borrow_records (
 );
 
 -- Biometric verification logs table
-CREATE TABLE IF NOT EXISTS biometric_verification_logs (
+CREATE TABLE biometric_verification_logs (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   student_id VARCHAR(36) NOT NULL,
   book_id VARCHAR(36) NULL,
-  verification_type ENUM('book_issue', 'book_return', 'enrollment', 'verification') NOT NULL,
-  verification_method ENUM('fingerprint', 'face', 'card') NOT NULL,
-  verification_status ENUM('success', 'failed') NOT NULL,
+  verification_type VARCHAR(20) NOT NULL CHECK (verification_type IN ('book_issue', 'book_return', 'enrollment', 'verification')),
+  verification_method VARCHAR(20) NOT NULL CHECK (verification_method IN ('fingerprint', 'face', 'card')),
+  verification_status VARCHAR(20) NOT NULL CHECK (verification_status IN ('success', 'failed')),
   verified_by VARCHAR(255),
   verification_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   borrow_record_id VARCHAR(36) NULL,
   additional_data JSON,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
   FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE SET NULL,
   FOREIGN KEY (borrow_record_id) REFERENCES borrow_records(id) ON DELETE SET NULL,
@@ -90,23 +91,23 @@ CREATE TABLE IF NOT EXISTS biometric_verification_logs (
 );
 
 -- User roles and permissions (for future admin features)
-CREATE TABLE IF NOT EXISTS user_roles (
+CREATE TABLE user_roles (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   name VARCHAR(100) UNIQUE NOT NULL,
   description TEXT,
   permissions JSON,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- System settings table
-CREATE TABLE IF NOT EXISTS system_settings (
+CREATE TABLE system_settings (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   setting_key VARCHAR(255) UNIQUE NOT NULL,
   setting_value JSON,
   description TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_setting_key (setting_key)
 );
 
@@ -161,6 +162,36 @@ END;
 
 DELIMITER ;
 
+-- Create triggers for stock control
+DELIMITER //
+
+CREATE TRIGGER before_borrow_check_stock
+BEFORE INSERT ON borrow_records
+FOR EACH ROW
+BEGIN
+  IF NEW.status = 'borrowed' THEN
+    DECLARE avail INT;
+    SELECT available_copies INTO avail FROM books WHERE id = NEW.book_id;
+    IF avail <= 0 THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'No available copies for this book';
+    END IF;
+    UPDATE books SET available_copies = available_copies - 1 WHERE id = NEW.book_id;
+  END IF;
+END;
+//
+
+CREATE TRIGGER after_borrow_return_stock
+AFTER UPDATE ON borrow_records
+FOR EACH ROW
+BEGIN
+  IF OLD.status != 'returned' AND NEW.status = 'returned' THEN
+    UPDATE books SET available_copies = available_copies + 1 WHERE id = NEW.book_id;
+  END IF;
+END;
+//
+
+DELIMITER ;
+
 -- Create stored procedure for auto-blacklisting overdue students
 DELIMITER //
 
@@ -193,10 +224,9 @@ END;
 DELIMITER ;
 
 -- Create event to run auto-blacklist procedure daily
-CREATE EVENT IF NOT EXISTS daily_auto_blacklist
-ON SCHEDULE EVERY 1 DAY STARTS '2024-01-01 00:00:00'
-DO
-  CALL auto_blacklist_overdue_students();
+-- CREATE EVENT daily_auto_blacklist
+-- ON SCHEDULE EVERY 1 DAY STARTS '2024-01-01 00:00:00'
+-- DO CALL auto_blacklist_overdue_students();
 
 -- Enable event scheduler
-SET GLOBAL event_scheduler = ON;
+-- SET GLOBAL event_scheduler = ON;

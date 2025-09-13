@@ -212,6 +212,40 @@ app.post('/api/students', async (req, res) => {
   }
 });
 
+// Get all enrolled biometric data for duplicate checking
+app.get('/api/students/biometric-data', async (req, res) => {
+  try {
+    if (useMockData) {
+      // Mock biometric data
+      const students = await mockDataProvider.fetchStudents();
+      const biometricStudents = students.filter(s => s.biometric_enrolled).map(s => ({
+        id: s.id,
+        name: s.name,
+        biometric_data: s.biometric_data
+      }));
+      res.json(biometricStudents);
+    } else {
+      const query = `
+        SELECT id, name, biometric_data
+        FROM students
+        WHERE biometric_enrolled = true AND biometric_data IS NOT NULL
+      `;
+      const rows = await executeQuery(query);
+
+      // Parse biometric_data JSON
+      const biometricStudents = rows.map(row => ({
+        ...row,
+        biometric_data: row.biometric_data ? JSON.parse(row.biometric_data) : null
+      }));
+
+      res.json(biometricStudents || []);
+    }
+  } catch (error) {
+    console.error('Error fetching biometric data:', error);
+    res.status(500).json({ error: 'Failed to fetch biometric data' });
+  }
+});
+
 // Biometric enrollment route
 app.put('/api/students/:studentId/biometric', async (req, res) => {
   try {

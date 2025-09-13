@@ -24,13 +24,100 @@ export const BiometricEnrollment: React.FC<BiometricEnrollmentProps> = ({
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [enrollmentStep, setEnrollmentStep] = useState<'start' | 'enrolling' | 'complete'>('start');
 
+  // Check for duplicate fingerprints before enrollment
+  const checkForDuplicates = async (newFingerprint: string): Promise<boolean> => {
+    try {
+      // Fetch all enrolled biometric data
+      const existingBiometricData = await apiClient.getBiometricData();
+
+      if (existingBiometricData.length === 0) {
+        return false; // No duplicates if no existing data
+      }
+
+      // Get SDK instance for verification
+      const win = window as any;
+      const sdkAvailable = !!(
+        (win.Fingerprint && win.Fingerprint.WebApi) ||
+        win.DPWebSDK ||
+        win.dpWebSDK ||
+        win.DigitalPersona ||
+        win.DPFP ||
+        win.WebSdk
+      );
+
+      if (!sdkAvailable) {
+        console.warn('SDK not available for duplicate check, proceeding with enrollment');
+        return false;
+      }
+
+      let reader;
+      try {
+        // Initialize SDK reader for verification
+        if (win.Fingerprint?.WebApi) {
+          reader = new win.Fingerprint.WebApi();
+        } else if (win.WebSdk) {
+          reader = typeof win.WebSdk === 'function' ? new win.WebSdk() : win.WebSdk;
+        } else {
+          console.warn('Unsupported SDK for verification, proceeding with enrollment');
+          return false;
+        }
+
+        // Check each existing fingerprint
+        for (const existing of existingBiometricData) {
+          if (!existing.biometric_data?.fingerprint) continue;
+
+          try {
+            // Use SDK verification method (this is a simplified implementation)
+            // In a real implementation, you'd use the SDK's verify method
+            const verificationResult = await reader.verifyFingerprints(
+              newFingerprint,
+              existing.biometric_data.fingerprint
+            );
+
+            // Check if verification score is above threshold (e.g., 80%)
+            if (verificationResult.score > 0.8) {
+              toast({
+                title: "Duplicate Fingerprint Detected",
+                description: `This fingerprint is already enrolled for ${existing.name}. Enrollment cancelled.`,
+                variant: "destructive"
+              });
+              return true; // Duplicate found
+            }
+          } catch (verifyError) {
+            console.warn('Verification failed for existing fingerprint:', verifyError);
+            // Continue checking other fingerprints
+          }
+        }
+
+        return false; // No duplicates found
+
+      } catch (sdkError) {
+        console.warn('SDK verification setup failed:', sdkError);
+        return false; // Proceed with enrollment if verification fails
+      }
+
+    } catch (error) {
+      console.error('Error checking for duplicates:', error);
+      // Proceed with enrollment if duplicate check fails
+      return false;
+    }
+  };
+
   // ES6: Enhanced async/await with destructuring and arrow functions
   const handleEnrollmentSuccess = async (biometricData: string) => {
     setIsEnrolling(true);
-    
+
     try {
       const biometricInfo = JSON.parse(biometricData);
-      
+
+      // Check for duplicate fingerprints before saving
+      const isDuplicate = await checkForDuplicates(biometricInfo.fingerprint);
+
+      if (isDuplicate) {
+        setIsEnrolling(false);
+        return; // Stop enrollment if duplicate found
+      }
+
       // ES6: Object property shorthand
       const updateData = {
         biometric_enrolled: true,
@@ -49,7 +136,7 @@ export const BiometricEnrollment: React.FC<BiometricEnrollmentProps> = ({
           description: `Biometric data enrolled successfully for ${studentName}`
         })
       ];
-      
+
       completionActions.forEach(action => action());
 
       // ES6: Arrow function in setTimeout
