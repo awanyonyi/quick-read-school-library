@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { BiometricAuth } from './BiometricAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { apiClient } from '@/utils/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Fingerprint, CheckCircle } from 'lucide-react';
 
@@ -37,13 +37,8 @@ export const BiometricEnrollment: React.FC<BiometricEnrollmentProps> = ({
         biometric_id: biometricInfo.biometricId,
         biometric_data: biometricInfo
       };
-      
-      const { error } = await supabase
-        .from('students')
-        .update(updateData)
-        .eq('id', studentId);
 
-      if (error) throw error;
+      await apiClient.updateBiometricData(studentId, updateData);
 
       // ES6: Array of completion actions
       const completionActions = [
