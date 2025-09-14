@@ -9,12 +9,14 @@ export const getBorrowRecords = async (req: Request, res: Response) => {
         br.*,
         b.title as book_title,
         b.author as book_author,
-        b.isbn as book_isbn,
+        bc.isbn as book_isbn,
+        bc.id as book_copy_id,
         s.name as student_name,
         s.admission_number as student_admission,
         s.class as student_class
       FROM borrow_records br
-      LEFT JOIN books b ON br.book_id = b.id
+      LEFT JOIN book_copies bc ON br.book_copy_id = bc.id
+      LEFT JOIN books b ON bc.book_id = b.id
       LEFT JOIN students s ON br.student_id = s.id
       ORDER BY br.borrow_date DESC
     `;
@@ -26,7 +28,8 @@ export const getBorrowRecords = async (req: Request, res: Response) => {
       books: {
         title: row.book_title,
         author: row.book_author,
-        isbn: row.book_isbn
+        isbn: row.book_isbn,
+        copy_id: row.book_copy_id
       },
       students: {
         name: row.student_name,
@@ -45,7 +48,7 @@ export const getBorrowRecords = async (req: Request, res: Response) => {
 // Create a new borrow record
 export const createBorrowRecord = async (req: Request, res: Response) => {
   try {
-    const { book_id, student_id, due_period_value = 24, due_period_unit = 'hours' } = req.body;
+    const { book_copy_id, student_id, due_period_value = 24, due_period_unit = 'hours' } = req.body;
 
     // First, automatically process overdue books to update blacklist status
     try {
@@ -90,34 +93,37 @@ export const createBorrowRecord = async (req: Request, res: Response) => {
       }
     }
 
-    // Check if book is available and get due period settings
-    const bookQuery = `
-      SELECT available_copies, due_period_value, due_period_unit FROM books WHERE id = ?
+    // Check if book copy is available and get due period settings
+    const bookCopyQuery = `
+      SELECT bc.status, b.due_period_value, b.due_period_unit
+      FROM book_copies bc
+      JOIN books b ON bc.book_id = b.id
+      WHERE bc.id = ?
     `;
-    const [bookResult] = await pool.execute(bookQuery, [book_id]);
-    const book = (bookResult as any)[0];
+    const [bookCopyResult] = await pool.execute(bookCopyQuery, [book_copy_id]);
+    const bookCopy = (bookCopyResult as any)[0];
 
-    if (!book) {
-      return res.status(404).json({ error: 'Book not found' });
+    if (!bookCopy) {
+      return res.status(404).json({ error: 'Book copy not found' });
     }
 
-    if (book.available_copies <= 0) {
-      return res.status(400).json({ error: 'Book is not available for borrowing' });
+    if (bookCopy.status !== 'available') {
+      return res.status(400).json({ error: 'Book copy is not available for borrowing' });
     }
 
     // Calculate due date based on custom period or book's default settings
     const borrowDate = new Date();
     const dueDateStr = calculateDueDate(
       borrowDate.toISOString(),
-      due_period_value || book.due_period_value || 24,
-      due_period_unit || book.due_period_unit || 'hours'
+      due_period_value || bookCopy.due_period_value || 24,
+      due_period_unit || bookCopy.due_period_unit || 'hours'
     );
     const dueDate = new Date(dueDateStr);
 
     // Create borrow record
     const insertQuery = `
       INSERT INTO borrow_records (
-        id, book_id, student_id, borrow_date, due_date, status,
+        id, book_copy_id, student_id, borrow_date, due_date, status,
         created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, 'borrowed', NOW(), NOW())
     `;
@@ -125,21 +131,17 @@ export const createBorrowRecord = async (req: Request, res: Response) => {
     const recordId = crypto.randomUUID();
     await pool.execute(insertQuery, [
       recordId,
-      book_id,
+      book_copy_id,
       student_id,
       borrowDate.toISOString(),
       dueDate.toISOString()
     ]);
 
-    // Update book availability
-    const updateQuery = `
-      UPDATE books SET available_copies = available_copies - 1 WHERE id = ?
-    `;
-    await pool.execute(updateQuery, [book_id]);
+    // The trigger will automatically update the book copy status
 
     res.json({
       id: recordId,
-      book_id,
+      book_copy_id,
       student_id,
       borrow_date: borrowDate.toISOString(),
       due_date: dueDate.toISOString(),
@@ -158,9 +160,9 @@ export const returnBook = async (req: Request, res: Response) => {
   try {
     const { recordId } = req.params;
 
-    // First get the borrow record to get the book_id
+    // First get the borrow record to get the book_copy_id
     const recordQuery = `
-      SELECT book_id FROM borrow_records WHERE id = ?
+      SELECT book_copy_id FROM borrow_records WHERE id = ?
     `;
     const [recordResult] = await pool.execute(recordQuery, [recordId]);
     const borrowRecord = (recordResult as any)[0];
@@ -177,15 +179,11 @@ export const returnBook = async (req: Request, res: Response) => {
     `;
     await pool.execute(updateRecordQuery, [recordId]);
 
-    // Increment book availability
-    const updateBookQuery = `
-      UPDATE books SET available_copies = available_copies + 1 WHERE id = ?
-    `;
-    await pool.execute(updateBookQuery, [borrowRecord.book_id]);
+    // The trigger will automatically update the book copy status
 
     res.json({
       id: recordId,
-      book_id: borrowRecord.book_id,
+      book_copy_id: borrowRecord.book_copy_id,
       return_date: new Date().toISOString(),
       status: 'returned',
       updated_at: new Date().toISOString()

@@ -10,8 +10,8 @@ import { Plus, Edit, Trash2, User, Upload, Fingerprint, Shield } from 'lucide-re
 import { toast } from '@/hooks/use-toast';
 import { StudentExcelUpload } from './StudentExcelUpload';
 import { BiometricEnrollment } from './BiometricEnrollment';
-import { supabase } from '@/integrations/supabase/client';
 import { fetchStudents, addStudent } from '@/utils/libraryData';
+import { apiClient } from '@/utils/apiClient';
 
 interface StudentManagementProps {
   onUpdate: () => void;
@@ -63,17 +63,12 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
     try {
       if (editingStudent) {
         // Update existing student
-        const { error } = await supabase
-          .from('students')
-          .update({
-            name: formData.name,
-            admission_number: formData.admission_number,
-            email: formData.email,
-            class: formData.class
-          })
-          .eq('id', editingStudent.id);
-
-        if (error) throw error;
+        await apiClient.updateStudent(editingStudent.id, {
+          name: formData.name,
+          admission_number: formData.admission_number,
+          email: formData.email,
+          class: formData.class
+        });
 
         toast({
           title: "Success",
@@ -110,31 +105,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
 
   const handleDelete = async (studentId: string) => {
     try {
-      // First check if student has any active borrow records
-      const { data: borrowRecords, error: borrowCheckError } = await supabase
-        .from('borrow_records')
-        .select('id, status, book_id')
-        .eq('student_id', studentId)
-        .eq('status', 'borrowed');
-
-      if (borrowCheckError) {
-        console.warn('Error checking borrow records:', borrowCheckError);
-      } else if (borrowRecords && borrowRecords.length > 0) {
-        toast({
-          title: "Cannot Delete Student",
-          description: `Student has ${borrowRecords.length} active borrow record(s). Please return all books first.`,
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Proceed with deletion
-      const { error } = await supabase
-        .from('students')
-        .delete()
-        .eq('id', studentId);
-
-      if (error) throw error;
+      await apiClient.deleteStudent(studentId);
 
       toast({
         title: "Success",

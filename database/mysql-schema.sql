@@ -22,31 +22,40 @@ CREATE TABLE students (
   INDEX idx_blacklisted (blacklisted)
 );
 
--- Books table
+-- Books table (book metadata)
 CREATE TABLE books (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   title VARCHAR(500) NOT NULL,
   author VARCHAR(255) NOT NULL,
-  isbn VARCHAR(20) UNIQUE,
   category VARCHAR(100),
-  total_copies INT NOT NULL DEFAULT 1,
-  available_copies INT NOT NULL DEFAULT 1,
   due_period_value INT DEFAULT 24,
   due_period_unit VARCHAR(20) DEFAULT 'hours' CHECK (due_period_unit IN ('hours', 'days', 'weeks', 'months', 'years')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_title (title),
   INDEX idx_author (author),
+  INDEX idx_category (category)
+);
+
+-- Book copies table (each physical copy)
+CREATE TABLE book_copies (
+  id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  book_id VARCHAR(36) NOT NULL,
+  isbn VARCHAR(20) UNIQUE NOT NULL,
+  status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available', 'borrowed', 'lost', 'damaged')),
+  condition_notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
+  INDEX idx_book_id (book_id),
   INDEX idx_isbn (isbn),
-  INDEX idx_category (category),
-  INDEX idx_available_copies (available_copies),
-  CONSTRAINT chk_available_copies CHECK (available_copies >= 0)
+  INDEX idx_status (status)
 );
 
 -- Borrow records table
 CREATE TABLE borrow_records (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-  book_id VARCHAR(36) NOT NULL,
+  book_copy_id VARCHAR(36) NOT NULL,
   student_id VARCHAR(36) NOT NULL,
   borrow_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   due_date TIMESTAMP NOT NULL,
@@ -56,9 +65,9 @@ CREATE TABLE borrow_records (
   fine_paid BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
+  FOREIGN KEY (book_copy_id) REFERENCES book_copies(id) ON DELETE CASCADE,
   FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-  INDEX idx_book_id (book_id),
+  INDEX idx_book_copy_id (book_copy_id),
   INDEX idx_student_id (student_id),
   INDEX idx_status (status),
   INDEX idx_due_date (due_date),
@@ -69,7 +78,7 @@ CREATE TABLE borrow_records (
 CREATE TABLE biometric_verification_logs (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   student_id VARCHAR(36) NOT NULL,
-  book_id VARCHAR(36) NULL,
+  book_copy_id VARCHAR(36) NULL,
   verification_type VARCHAR(20) NOT NULL CHECK (verification_type IN ('book_issue', 'book_return', 'enrollment', 'verification')),
   verification_method VARCHAR(20) NOT NULL CHECK (verification_method IN ('fingerprint', 'face', 'card')),
   verification_status VARCHAR(20) NOT NULL CHECK (verification_status IN ('success', 'failed')),
@@ -80,10 +89,10 @@ CREATE TABLE biometric_verification_logs (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-  FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE SET NULL,
+  FOREIGN KEY (book_copy_id) REFERENCES book_copies(id) ON DELETE SET NULL,
   FOREIGN KEY (borrow_record_id) REFERENCES borrow_records(id) ON DELETE SET NULL,
   INDEX idx_student_id (student_id),
-  INDEX idx_book_id (book_id),
+  INDEX idx_book_copy_id (book_copy_id),
   INDEX idx_verification_type (verification_type),
   INDEX idx_verification_status (verification_status),
   INDEX idx_verification_timestamp (verification_timestamp),
@@ -170,12 +179,12 @@ BEFORE INSERT ON borrow_records
 FOR EACH ROW
 BEGIN
   IF NEW.status = 'borrowed' THEN
-    DECLARE avail INT;
-    SELECT available_copies INTO avail FROM books WHERE id = NEW.book_id;
-    IF avail <= 0 THEN
-      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'No available copies for this book';
+    DECLARE copy_status VARCHAR(20);
+    SELECT status INTO copy_status FROM book_copies WHERE id = NEW.book_copy_id;
+    IF copy_status != 'available' THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Book copy is not available for borrowing';
     END IF;
-    UPDATE books SET available_copies = available_copies - 1 WHERE id = NEW.book_id;
+    UPDATE book_copies SET status = 'borrowed' WHERE id = NEW.book_copy_id;
   END IF;
 END;
 //
@@ -185,7 +194,7 @@ AFTER UPDATE ON borrow_records
 FOR EACH ROW
 BEGIN
   IF OLD.status != 'returned' AND NEW.status = 'returned' THEN
-    UPDATE books SET available_copies = available_copies + 1 WHERE id = NEW.book_id;
+    UPDATE book_copies SET status = 'available' WHERE id = NEW.book_copy_id;
   END IF;
 END;
 //

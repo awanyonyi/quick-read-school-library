@@ -19,25 +19,34 @@ CREATE TABLE students (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Books table
+-- Books table (book metadata)
 CREATE TABLE books (
   id VARCHAR(36) PRIMARY KEY,
   title VARCHAR(500) NOT NULL,
   author VARCHAR(255) NOT NULL,
-  isbn VARCHAR(20) UNIQUE,
   category VARCHAR(100),
-  total_copies INT NOT NULL DEFAULT 1,
-  available_copies INT NOT NULL DEFAULT 1,
   due_period_value INT DEFAULT 24,
   due_period_unit VARCHAR(20) DEFAULT 'hours',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Book copies table (each physical copy)
+CREATE TABLE book_copies (
+  id VARCHAR(36) PRIMARY KEY,
+  book_id VARCHAR(36) NOT NULL,
+  isbn VARCHAR(20) UNIQUE NOT NULL,
+  status VARCHAR(20) DEFAULT 'available',
+  condition_notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (book_id) REFERENCES books(id)
+);
+
 -- Borrow records table
 CREATE TABLE borrow_records (
   id VARCHAR(36) PRIMARY KEY,
-  book_id VARCHAR(36) NOT NULL,
+  book_copy_id VARCHAR(36) NOT NULL,
   student_id VARCHAR(36) NOT NULL,
   borrow_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   due_date TIMESTAMP NOT NULL,
@@ -47,7 +56,7 @@ CREATE TABLE borrow_records (
   fine_paid BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (book_id) REFERENCES books(id),
+  FOREIGN KEY (book_copy_id) REFERENCES book_copies(id),
   FOREIGN KEY (student_id) REFERENCES students(id)
 );
 
@@ -55,7 +64,7 @@ CREATE TABLE borrow_records (
 CREATE TABLE biometric_verification_logs (
   id VARCHAR(36) PRIMARY KEY,
   student_id VARCHAR(36) NOT NULL,
-  book_id VARCHAR(36) NULL,
+  book_copy_id VARCHAR(36) NULL,
   verification_type VARCHAR(20) NOT NULL,
   verification_method VARCHAR(20) NOT NULL,
   verification_status VARCHAR(20) NOT NULL,
@@ -66,7 +75,7 @@ CREATE TABLE biometric_verification_logs (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (student_id) REFERENCES students(id),
-  FOREIGN KEY (book_id) REFERENCES books(id),
+  FOREIGN KEY (book_copy_id) REFERENCES book_copies(id),
   FOREIGN KEY (borrow_record_id) REFERENCES borrow_records(id)
 );
 
@@ -97,16 +106,19 @@ CREATE INDEX idx_students_blacklisted ON students(blacklisted);
 
 CREATE INDEX idx_books_title ON books(title);
 CREATE INDEX idx_books_author ON books(author);
-CREATE INDEX idx_books_isbn ON books(isbn);
 CREATE INDEX idx_books_category ON books(category);
 
-CREATE INDEX idx_borrow_book_id ON borrow_records(book_id);
+CREATE INDEX idx_book_copies_book_id ON book_copies(book_id);
+CREATE INDEX idx_book_copies_isbn ON book_copies(isbn);
+CREATE INDEX idx_book_copies_status ON book_copies(status);
+
+CREATE INDEX idx_borrow_book_copy_id ON borrow_records(book_copy_id);
 CREATE INDEX idx_borrow_student_id ON borrow_records(student_id);
 CREATE INDEX idx_borrow_status ON borrow_records(status);
 CREATE INDEX idx_borrow_due_date ON borrow_records(due_date);
 
 CREATE INDEX idx_biometric_student ON biometric_verification_logs(student_id);
-CREATE INDEX idx_biometric_book ON biometric_verification_logs(book_id);
+CREATE INDEX idx_biometric_book_copy ON biometric_verification_logs(book_copy_id);
 CREATE INDEX idx_biometric_type ON biometric_verification_logs(verification_type);
 CREATE INDEX idx_biometric_status ON biometric_verification_logs(verification_status);
 

@@ -64,6 +64,10 @@ async function migrateData() {
     console.log('\n🔐 Migrating biometric verification logs...');
     await migrateBiometricLogs(mysqlConnection);
 
+    // Migrate system settings and user roles
+    console.log('\n⚙️  Migrating system settings and user roles...');
+    await migrateSystemSettings(mysqlConnection);
+
     console.log('\n🎉 Migration completed successfully!');
 
   } catch (error) {
@@ -157,49 +161,73 @@ async function migrateBooks(mysqlConnection) {
 
     console.log(`📊 Found ${books.length} books to migrate`);
 
-    // Insert books into MySQL
-    const insertQuery = `
+    // Insert books into MySQL (without total_copies/available_copies)
+    const insertBookQuery = `
       INSERT INTO books (
-        id, title, author, isbn, category,
-        total_copies, available_copies,
+        id, title, author, category,
         due_period_value, due_period_unit,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         title = VALUES(title),
         author = VALUES(author),
-        isbn = VALUES(isbn),
         category = VALUES(category),
-        total_copies = VALUES(total_copies),
-        available_copies = VALUES(available_copies),
         due_period_value = VALUES(due_period_value),
         due_period_unit = VALUES(due_period_unit),
         updated_at = NOW()
     `;
 
+    // Insert book copies
+    const insertCopyQuery = `
+      INSERT INTO book_copies (
+        id, book_id, isbn, status, condition_notes,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+
     let successCount = 0;
     for (const book of books) {
       try {
-        await mysqlConnection.execute(insertQuery, [
+        // Insert book metadata
+        await mysqlConnection.execute(insertBookQuery, [
           book.id,
           book.title,
           book.author,
-          book.isbn || null,
           book.category || null,
-          book.total_copies || 1,
-          book.available_copies || book.total_copies || 1,
           book.due_period_value || 24,
           book.due_period_unit || 'hours',
           book.created_at,
           book.updated_at || book.created_at
         ]);
+
+        // Create book copies with unique ISBNs
+        const totalCopies = book.total_copies || 1;
+        const availableCopies = book.available_copies || totalCopies;
+
+        for (let i = 1; i <= totalCopies; i++) {
+          const copyId = `${book.id}_copy_${i}`;
+          // Generate unique 13-digit ISBN
+          const isbn = Math.floor(Math.random() * 9000000000000) + 1000000000000;
+          const status = i <= availableCopies ? 'available' : 'borrowed';
+
+          await mysqlConnection.execute(insertCopyQuery, [
+            copyId,
+            book.id,
+            isbn.toString(),
+            status,
+            null, // condition_notes
+            book.created_at,
+            book.updated_at || book.created_at
+          ]);
+        }
+
         successCount++;
       } catch (err) {
         console.error(`❌ Failed to migrate book ${book.id}:`, err.message);
       }
     }
 
-    console.log(`✅ Successfully migrated ${successCount}/${books.length} books`);
+    console.log(`✅ Successfully migrated ${successCount}/${books.length} books with their copies`);
 
   } catch (error) {
     console.error('❌ Error migrating books:', error.message);
@@ -224,27 +252,50 @@ async function migrateBorrowRecords(mysqlConnection) {
 
     console.log(`📊 Found ${records.length} borrow records to migrate`);
 
-    // Insert borrow records into MySQL
-    const insertQuery = `
-      INSERT INTO borrow_records (
-        id, book_id, student_id, borrow_date, due_date,
-        return_date, status, fine_amount, fine_paid,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        return_date = VALUES(return_date),
-        status = VALUES(status),
-        fine_amount = VALUES(fine_amount),
-        fine_paid = VALUES(fine_paid),
-        updated_at = NOW()
-    `;
-
     let successCount = 0;
     for (const record of records) {
       try {
+        // Find an available copy for this book
+        const [copyResult] = await mysqlConnection.execute(
+          `SELECT id FROM book_copies WHERE book_id = ? AND status = 'available' LIMIT 1`,
+          [record.book_id]
+        );
+
+        if (!copyResult || copyResult.length === 0) {
+          // If no available copy, find any copy (could be borrowed already)
+          const [anyCopyResult] = await mysqlConnection.execute(
+            `SELECT id FROM book_copies WHERE book_id = ? LIMIT 1`,
+            [record.book_id]
+          );
+
+          if (!anyCopyResult || anyCopyResult.length === 0) {
+            console.error(`❌ No copies found for book ${record.book_id}, skipping borrow record ${record.id}`);
+            continue;
+          }
+
+          copyId = anyCopyResult[0].id;
+        } else {
+          copyId = copyResult[0].id;
+        }
+
+        // Insert borrow record into MySQL
+        const insertQuery = `
+          INSERT INTO borrow_records (
+            id, book_copy_id, student_id, borrow_date, due_date,
+            return_date, status, fine_amount, fine_paid,
+            created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            return_date = VALUES(return_date),
+            status = VALUES(status),
+            fine_amount = VALUES(fine_amount),
+            fine_paid = VALUES(fine_paid),
+            updated_at = NOW()
+        `;
+
         await mysqlConnection.execute(insertQuery, [
           record.id,
-          record.book_id,
+          copyId,
           record.student_id,
           record.borrow_date,
           record.due_date,
@@ -255,6 +306,7 @@ async function migrateBorrowRecords(mysqlConnection) {
           record.created_at,
           record.updated_at || record.created_at
         ]);
+
         successCount++;
       } catch (err) {
         console.error(`❌ Failed to migrate borrow record ${record.id}:`, err.message);
@@ -289,28 +341,52 @@ async function migrateBiometricLogs(mysqlConnection) {
 
     console.log(`📊 Found ${logs.length} biometric verification logs to migrate`);
 
-    // Insert biometric logs into MySQL
-    const insertQuery = `
-      INSERT INTO biometric_verification_logs (
-        id, student_id, book_id, verification_type,
-        verification_method, verification_status, verified_by,
-        verification_timestamp, borrow_record_id, additional_data,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        verification_status = VALUES(verification_status),
-        verified_by = VALUES(verified_by),
-        additional_data = VALUES(additional_data),
-        updated_at = NOW()
-    `;
-
     let successCount = 0;
     for (const log of logs) {
       try {
+        let bookCopyId = null;
+
+        // If there's a borrow_record_id, get the book_copy_id from it
+        if (log.borrow_record_id) {
+          const [borrowResult] = await mysqlConnection.execute(
+            `SELECT book_copy_id FROM borrow_records WHERE id = ?`,
+            [log.borrow_record_id]
+          );
+          if (borrowResult && borrowResult.length > 0) {
+            bookCopyId = borrowResult[0].book_copy_id;
+          }
+        }
+
+        // If no borrow_record_id but there's a book_id, find a copy for that book
+        if (!bookCopyId && log.book_id) {
+          const [copyResult] = await mysqlConnection.execute(
+            `SELECT id FROM book_copies WHERE book_id = ? LIMIT 1`,
+            [log.book_id]
+          );
+          if (copyResult && copyResult.length > 0) {
+            bookCopyId = copyResult[0].id;
+          }
+        }
+
+        // Insert biometric logs into MySQL
+        const insertQuery = `
+          INSERT INTO biometric_verification_logs (
+            id, student_id, book_copy_id, verification_type,
+            verification_method, verification_status, verified_by,
+            verification_timestamp, borrow_record_id, additional_data,
+            created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            verification_status = VALUES(verification_status),
+            verified_by = VALUES(verified_by),
+            additional_data = VALUES(additional_data),
+            updated_at = NOW()
+        `;
+
         await mysqlConnection.execute(insertQuery, [
           log.id,
           log.student_id,
-          log.book_id || null,
+          bookCopyId,
           log.verification_type,
           log.verification_method,
           log.verification_status,
@@ -340,4 +416,34 @@ if (require.main === module) {
   migrateData().catch(console.error);
 }
 
-module.exports = { migrateData, migrateStudents, migrateBooks, migrateBorrowRecords, migrateBiometricLogs };
+async function migrateSystemSettings(mysqlConnection) {
+  try {
+    // Insert default system settings
+    const settingsQuery = `
+      INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES
+      ('library_name', '"Maryland School Library"', 'Name of the library'),
+      ('default_borrow_period', '{"value": 24, "unit": "hours"}', 'Default borrowing period'),
+      ('fine_per_day', '10.00', 'Fine amount per overdue day in KES'),
+      ('max_borrow_limit', '3', 'Maximum books a student can borrow'),
+      ('biometric_required', 'true', 'Whether biometric verification is required')
+    `;
+    await mysqlConnection.execute(settingsQuery);
+
+    // Insert default user roles
+    const rolesQuery = `
+      INSERT IGNORE INTO user_roles (name, description, permissions) VALUES
+      ('admin', 'System Administrator', '{"all": true}'),
+      ('librarian', 'Library Staff', '{"manage_books": true, "manage_students": true, "issue_books": true, "return_books": true}'),
+      ('student', 'Student User', '{"borrow_books": true, "view_history": true}')
+    `;
+    await mysqlConnection.execute(rolesQuery);
+
+    console.log('✅ Successfully inserted default system settings and user roles');
+
+  } catch (error) {
+    console.error('❌ Error migrating system settings:', error.message);
+    // Don't throw error for system settings as they might already exist
+  }
+}
+
+module.exports = { migrateData, migrateStudents, migrateBooks, migrateBorrowRecords, migrateBiometricLogs, migrateSystemSettings };

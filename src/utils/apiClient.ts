@@ -64,6 +64,19 @@ class ApiClient {
     });
   }
 
+  async updateStudent(studentId: string, studentData: any): Promise<any> {
+    return this.request(`/students/${studentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(studentData),
+    });
+  }
+
+  async deleteStudent(studentId: string): Promise<any> {
+    return this.request(`/students/${studentId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Borrowing API
   async getBorrowRecords(): Promise<any[]> {
     return this.request('/borrowing');

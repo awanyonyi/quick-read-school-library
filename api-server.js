@@ -212,6 +212,79 @@ app.post('/api/students', async (req, res) => {
   }
 });
 
+app.put('/api/students/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { name, admission_number, email, class: studentClass } = req.body;
+
+    if (useMockData) {
+      // Mock update
+      res.json({
+        id: studentId,
+        name,
+        admission_number,
+        email,
+        class: studentClass,
+        updated_at: new Date()
+      });
+    } else {
+      const query = `
+        UPDATE students
+        SET name = ?, admission_number = ?, email = ?, class = ?, updated_at = NOW()
+        WHERE id = ?
+      `;
+
+      await pool.execute(query, [name, admission_number, email || null, studentClass || null, studentId]);
+
+      // Fetch updated student data
+      const selectQuery = `SELECT * FROM students WHERE id = ?`;
+      const [rows] = await pool.execute(selectQuery, [studentId]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Student not found' });
+      }
+
+      res.json(rows[0]);
+    }
+  } catch (error) {
+    console.error('Error updating student:', error);
+    res.status(500).json({ error: 'Failed to update student' });
+  }
+});
+
+app.delete('/api/students/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    if (useMockData) {
+      // Mock delete
+      res.json({ message: 'Student deleted successfully' });
+    } else {
+      // Check if student has active borrow records
+      const borrowCheckQuery = `
+        SELECT COUNT(*) as count FROM borrow_records
+        WHERE student_id = ? AND status = 'borrowed'
+      `;
+      const [borrowCheckResult] = await pool.execute(borrowCheckQuery, [studentId]);
+      const activeBorrows = borrowCheckResult[0]?.count || 0;
+
+      if (activeBorrows > 0) {
+        return res.status(400).json({
+          error: `Student has ${activeBorrows} active borrow record(s). Please return all books first.`
+        });
+      }
+
+      const query = `DELETE FROM students WHERE id = ?`;
+      await pool.execute(query, [studentId]);
+
+      res.json({ message: 'Student deleted successfully' });
+    }
+  } catch (error) {
+    console.error('Error deleting student:', error);
+    res.status(500).json({ error: 'Failed to delete student' });
+  }
+});
+
 // Get all enrolled biometric data for duplicate checking
 app.get('/api/students/biometric-data', async (req, res) => {
   try {
