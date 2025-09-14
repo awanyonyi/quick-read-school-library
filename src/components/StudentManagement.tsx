@@ -97,11 +97,12 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
       resetForm();
       loadStudents();
       onUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving student:', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to save student";
       toast({
         title: "Error",
-        description: error.message || "Failed to save student",
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -109,6 +110,25 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
 
   const handleDelete = async (studentId: string) => {
     try {
+      // First check if student has any active borrow records
+      const { data: borrowRecords, error: borrowCheckError } = await supabase
+        .from('borrow_records')
+        .select('id, status, book_id')
+        .eq('student_id', studentId)
+        .eq('status', 'borrowed');
+
+      if (borrowCheckError) {
+        console.warn('Error checking borrow records:', borrowCheckError);
+      } else if (borrowRecords && borrowRecords.length > 0) {
+        toast({
+          title: "Cannot Delete Student",
+          description: `Student has ${borrowRecords.length} active borrow record(s). Please return all books first.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Proceed with deletion
       const { error } = await supabase
         .from('students')
         .delete()
@@ -120,14 +140,46 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
         title: "Success",
         description: "Student deleted successfully"
       });
-      
+
       loadStudents();
       onUpdate();
-    } catch (error: any) {
-      console.error('Error deleting student:', error);
+    } catch (error: unknown) {
+      // Enhanced error logging for better debugging
+      console.error('Error deleting student:', {
+        error,
+        type: typeof error,
+        constructor: error?.constructor?.name,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        // Additional Supabase error details
+        ...(typeof error === 'object' && error !== null && 'details' in error && { details: (error as any).details }),
+        ...(typeof error === 'object' && error !== null && 'hint' in error && { hint: (error as any).hint }),
+        ...(typeof error === 'object' && error !== null && 'code' in error && { code: (error as any).code })
+      });
+
+      let errorMessage = "Failed to delete student";
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        // Try to extract meaningful information from Supabase error object
+        const errorObj = error as any;
+        if (errorObj.message) {
+          errorMessage = errorObj.message;
+        } else if (errorObj.error?.message) {
+          errorMessage = errorObj.error.message;
+        } else if (errorObj.details) {
+          errorMessage = errorObj.details;
+        } else if (errorObj.hint) {
+          errorMessage = `Database error: ${errorObj.hint}`;
+        } else if (errorObj.code) {
+          errorMessage = `Database error (code: ${errorObj.code})`;
+        }
+      }
+
       toast({
         title: "Error",
-        description: error.message || "Failed to delete student",
+        description: errorMessage,
         variant: "destructive"
       });
     }

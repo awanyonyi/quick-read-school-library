@@ -178,33 +178,87 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
         }
       });
 
-      // Enhanced success message with detailed student information
-      toast({
-        title: "✅ Book Issued Successfully",
-        description: (
-          <div className="space-y-2">
-            <div className="font-semibold text-green-700">
-              📖 {book.title}
-            </div>
-            <div className="text-sm">
-              <div className="font-medium">👤 {verifiedStudent.name}</div>
-              <div className="text-gray-600">
-                Admission: {verifiedStudent.admission_number} • Class: {verifiedStudent.class}
-              </div>
-              <div className="text-gray-600">
-                Due: {getBorrowDueDate(
-                  new Date(),
-                  pendingIssueData.borrowPeriod.value,
-                  pendingIssueData.borrowPeriod.unit
-                ).toLocaleDateString()}
-              </div>
-            </div>
-            <div className="text-xs text-green-600 font-medium">
-              🔐 Biometric verification successful
+      // Enhanced success message with detailed student information and flash effect
+      const successMessage = (
+        <div className="space-y-3 animate-pulse">
+          <div className="text-center">
+            <div className="text-2xl mb-2">🎉</div>
+            <div className="font-bold text-lg text-green-700">
+              BOOK ISSUED SUCCESSFULLY!
             </div>
           </div>
-        ),
-        duration: 8000, // Show longer for detailed info
+
+          <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 space-y-3">
+            <div className="text-center">
+              <div className="font-semibold text-lg text-green-800">
+                📖 {book.title}
+              </div>
+              <div className="text-sm text-green-700">
+                by {book.author} • ISBN: {book.isbn || 'N/A'}
+              </div>
+            </div>
+
+            <div className="border-t border-green-200 pt-3">
+              <div className="text-center space-y-2">
+                <div className="font-medium text-green-800">👤 STUDENT DETAILS</div>
+                <div className="bg-white rounded p-3 space-y-1">
+                  <div className="font-semibold text-lg">{verifiedStudent.name}</div>
+                  <div className="text-sm text-gray-600">
+                    Admission: <span className="font-medium">{verifiedStudent.admission_number}</span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Class: <span className="font-medium">{verifiedStudent.class}</span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Email: <span className="font-medium">{verifiedStudent.email || 'Not provided'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-green-200 pt-3">
+              <div className="text-center space-y-2">
+                <div className="font-medium text-green-800">📅 BORROWING DETAILS</div>
+                <div className="bg-white rounded p-3 space-y-1">
+                  <div className="text-sm">
+                    <span className="font-medium">Issued:</span> {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium">Due:</span> {getBorrowDueDate(
+                      new Date(),
+                      pendingIssueData.borrowPeriod.value,
+                      pendingIssueData.borrowPeriod.unit
+                    ).toLocaleDateString()}
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium">Period:</span> {pendingIssueData.borrowPeriod.value} {pendingIssueData.borrowPeriod.unit}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-green-200 pt-3">
+              <div className="text-center">
+                <div className="inline-flex items-center gap-2 bg-green-100 px-4 py-2 rounded-full">
+                  <div className="text-green-600">🔐</div>
+                  <div className="font-medium text-green-800 text-sm">
+                    BIOMETRIC VERIFICATION SUCCESSFUL
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center text-xs text-green-600">
+            ✅ Database updated • ✅ Biometric log recorded • ✅ Book availability updated
+          </div>
+        </div>
+      );
+
+      toast({
+        title: "🎉 BOOK ISSUED SUCCESSFULLY!",
+        description: successMessage,
+        duration: 10000, // Show longer for detailed info
       });
 
       // Reset form

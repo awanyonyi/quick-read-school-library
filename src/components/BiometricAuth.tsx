@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 
 interface BiometricAuthProps {
   mode: "enroll" | "verify";
-  studentId: string;
+  studentId?: string; // Optional for verify mode
   onAuthSuccess: (biometricData: string) => void;
   onAuthError: (error: string) => void;
 }
@@ -13,6 +13,8 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
   onAuthSuccess,
   onAuthError,
 }) => {
+  // For verify mode, we might not have a studentId yet
+  const effectiveStudentId = studentId || 'unknown';
   const [status, setStatus] = useState<string>("Initializing device...");
   const [reader, setReader] = useState<any>(null);
   const [sdkLoaded, setSdkLoaded] = useState<boolean>(false);
@@ -243,8 +245,8 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
         }
 
         const biometricPayload = {
-          studentId,
-          biometricId: `${studentId}-${Date.now()}`,
+          studentId: effectiveStudentId,
+          biometricId: `${effectiveStudentId}-${Date.now()}`,
           fingerprint: fingerprintImage,
           mode,
           timestamp: new Date().toISOString(),
@@ -264,7 +266,7 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
     return () => {
       reader.stopAcquisition().catch(() => {});
     };
-  }, [mode, studentId, onAuthSuccess, onAuthError, reader, sdkLoaded]);
+  }, [mode, effectiveStudentId, onAuthSuccess, onAuthError, reader, sdkLoaded]);
 
   return (
     <div className="text-center space-y-3">

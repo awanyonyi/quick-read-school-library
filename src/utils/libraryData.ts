@@ -223,9 +223,9 @@ export const logBiometricVerification = async (verificationData: {
   }
 
   try {
-    // For now, just log to console since we don't have the biometric logging endpoint
-    console.log('✅ Biometric verification logged:', verificationData);
-    return { success: true };
+    const result = await apiClient.logBiometricVerification(verificationData);
+    console.log('✅ Biometric verification logged to database:', verificationData);
+    return { success: true, data: result };
   } catch (error) {
     console.error('Error in biometric verification logging:', error);
     // Don't throw error to avoid breaking the main flow

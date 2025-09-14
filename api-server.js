@@ -246,6 +246,144 @@ app.get('/api/students/biometric-data', async (req, res) => {
   }
 });
 
+// Get biometric verification logs
+app.get('/api/biometric-verification', async (req, res) => {
+  try {
+    const { student_id, book_id, verification_type, limit = 50 } = req.query;
+
+    if (useMockData) {
+      // Mock biometric verification logs
+      const mockLogs = [
+        {
+          id: 'mock-log-1',
+          student_id: student_id || 'mock-student-1',
+          book_id: book_id || null,
+          verification_type: verification_type || 'book_issue',
+          verification_method: 'fingerprint',
+          verification_status: 'success',
+          verified_by: 'system',
+          verification_timestamp: new Date().toISOString(),
+          borrow_record_id: null,
+          additional_data: { mock: true },
+          created_at: new Date().toISOString()
+        }
+      ];
+      res.json(mockLogs);
+    } else {
+      let query = `
+        SELECT
+          bvl.*,
+          s.name as student_name,
+          s.admission_number as student_admission,
+          s.class as student_class,
+          s.email as student_email,
+          bk.title as book_title,
+          bk.author as book_author,
+          bk.isbn as book_isbn
+        FROM biometric_verification_logs bvl
+        LEFT JOIN students s ON bvl.student_id = s.id
+        LEFT JOIN books bk ON bvl.book_id = bk.id
+        WHERE 1=1
+      `;
+
+      const params = [];
+
+      if (student_id) {
+        query += ' AND bvl.student_id = ?';
+        params.push(student_id);
+      }
+
+      if (book_id) {
+        query += ' AND bvl.book_id = ?';
+        params.push(book_id);
+      }
+
+      if (verification_type) {
+        query += ' AND bvl.verification_type = ?';
+        params.push(verification_type);
+      }
+
+      query += ' ORDER BY bvl.created_at DESC LIMIT ?';
+      params.push(parseInt(limit));
+
+      const rows = await executeQuery(query, params);
+
+      // Parse additional_data JSON
+      const logs = rows.map(row => ({
+        ...row,
+        additional_data: row.additional_data ? JSON.parse(row.additional_data) : null
+      }));
+
+      res.json(logs || []);
+    }
+  } catch (error) {
+    console.error('Error fetching biometric verification logs:', error);
+    res.status(500).json({ error: 'Failed to fetch biometric verification logs' });
+  }
+});
+
+// Biometric verification logging route
+app.post('/api/biometric-verification', async (req, res) => {
+  try {
+    const {
+      student_id,
+      book_id,
+      verification_type,
+      verification_method,
+      verification_status,
+      verified_by,
+      verification_timestamp,
+      borrow_record_id,
+      additional_data
+    } = req.body;
+
+    if (useMockData) {
+      // Mock biometric verification logging
+      console.log('✅ Biometric verification logged (mock):', {
+        student_id,
+        book_id,
+        verification_type,
+        verification_status,
+        verification_timestamp
+      });
+      res.json({ success: true, message: 'Biometric verification logged successfully (mock)' });
+    } else {
+      const query = `
+        INSERT INTO biometric_verification_logs (
+          id, student_id, book_id, verification_type, verification_method,
+          verification_status, verified_by, verification_timestamp,
+          borrow_record_id, additional_data, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      `;
+
+      const logId = crypto.randomUUID();
+      const values = [
+        logId,
+        student_id,
+        book_id || null,
+        verification_type,
+        verification_method,
+        verification_status,
+        verified_by || null,
+        verification_timestamp,
+        borrow_record_id || null,
+        additional_data ? JSON.stringify(additional_data) : null
+      ];
+
+      await pool.execute(query, values);
+
+      res.json({
+        success: true,
+        message: 'Biometric verification logged successfully',
+        log_id: logId
+      });
+    }
+  } catch (error) {
+    console.error('Error logging biometric verification:', error);
+    res.status(500).json({ error: 'Failed to log biometric verification' });
+  }
+});
+
 // Biometric enrollment route
 app.put('/api/students/:studentId/biometric', async (req, res) => {
   try {

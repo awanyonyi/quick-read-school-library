@@ -8,6 +8,7 @@ import { StudentManagement } from './StudentManagement';
 import { BorrowingManagement } from './BorrowingManagement';
 import BlacklistManagement from './BlacklistManagement';
 import { WeeklyReport } from './WeeklyReport';
+import { DatabaseRecords } from './DatabaseRecords';
 import { QuickReturnNavbar } from './QuickReturnNavbar';
 import { DashboardStats } from './dashboard/DashboardStats';
 import { StudentSearch } from './dashboard/StudentSearch';
@@ -15,15 +16,16 @@ import { BorrowingRecordSearch } from './dashboard/BorrowingRecordSearch';
 import { RecentActivity } from './dashboard/RecentActivity';
 import AdminPasswordReset from './dashboard/AdminPasswordReset';
 import { calculateFine, fetchBooks, fetchStudents, fetchBorrowRecords, returnBook } from '../utils/libraryData';
-import { 
-  BookOpen, 
-  Users, 
-  Clock, 
+import {
+  BookOpen,
+  Users,
+  Clock,
   LogOut,
   Library,
   FileText,
   Settings,
-  UserX
+  UserX,
+  Database
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -80,6 +82,7 @@ const AdminDashboard = () => {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Library },
+    { id: 'database', label: 'Database Records', icon: Database },
     { id: 'books', label: 'Books', icon: BookOpen },
     { id: 'students', label: 'Students', icon: Users },
     { id: 'borrowing', label: 'Borrowing', icon: Clock },
@@ -161,6 +164,8 @@ const AdminDashboard = () => {
             <RecentActivity books={books} students={students} borrowRecords={borrowRecords} />
           </div>
         )}
+
+        {activeTab === 'database' && <DatabaseRecords onUpdate={loadData} />}
 
         {activeTab === 'books' && <BookManagement onUpdate={loadData} />}
         {activeTab === 'students' && <StudentManagement onUpdate={loadData} />}

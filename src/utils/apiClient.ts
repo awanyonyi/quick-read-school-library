@@ -94,6 +94,33 @@ class ApiClient {
   async getBiometricData(): Promise<any[]> {
     return this.request('/students/biometric-data');
   }
+
+  // Log biometric verification event
+  async logBiometricVerification(verificationData: any): Promise<any> {
+    return this.request('/biometric-verification', {
+      method: 'POST',
+      body: JSON.stringify(verificationData),
+    });
+  }
+
+  // Get biometric verification logs
+  async getBiometricVerificationLogs(params?: {
+    student_id?: string;
+    book_id?: string;
+    verification_type?: string;
+    limit?: number;
+  }): Promise<any[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.student_id) queryParams.append('student_id', params.student_id);
+    if (params?.book_id) queryParams.append('book_id', params.book_id);
+    if (params?.verification_type) queryParams.append('verification_type', params.verification_type);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = queryString ? `/biometric-verification?${queryString}` : '/biometric-verification';
+
+    return this.request(endpoint);
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);
