@@ -3,13 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Lock, Eye, EyeOff, Shield } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 const AdminPasswordReset = () => {
-  const { user } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -20,7 +17,7 @@ const AdminPasswordReset = () => {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!currentPassword || !newPassword || !confirmPassword) {
       toast({
         title: "Error",
@@ -32,7 +29,7 @@ const AdminPasswordReset = () => {
 
     if (newPassword !== confirmPassword) {
       toast({
-        title: "Error", 
+        title: "Error",
         description: "New passwords do not match",
         variant: "destructive"
       });
@@ -60,51 +57,13 @@ const AdminPasswordReset = () => {
     setIsLoading(true);
 
     try {
-      // Get admin username from auth context (assuming we have it)
-      const adminData = await supabase
-        .from('admins')
-        .select('username')
-        .eq('id', user?.id)
-        .maybeSingle();
-
-      if (adminData.error) {
-        console.error('Error fetching admin:', adminData.error);
-        throw new Error('Failed to fetch admin data');
-      }
-
-      if (!adminData.data) {
-        throw new Error('Admin not found. Please ensure you are logged in as an admin.');
-      }
-
-      const { data, error } = await supabase.rpc('change_admin_password', {
-        admin_username: adminData.data.username,
-        current_password: currentPassword,
-        new_password: newPassword
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      const result = data[0];
-      if (!result.success) {
-        toast({
-          title: "Error",
-          description: result.message,
-          variant: "destructive"
-        });
-        return;
-      }
-
+      // For now, show a message that this feature is not yet implemented
+      // In a full implementation, this would make an API call to change the admin password
       toast({
-        title: "Success",
-        description: "Password changed successfully",
+        title: "Feature Not Implemented",
+        description: "Admin password reset is not yet implemented in the MySQL backend. Please contact system administrator.",
+        variant: "destructive"
       });
-
-      // Reset form
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
     } catch (error: any) {
       console.error('Error changing password:', error);
       toast({

@@ -1,6 +1,5 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 export interface UserProfile {
@@ -49,57 +48,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
-      
-      // Try admin login first using secure database lookup
-      const { data: adminData, error: adminError } = await supabase
-        .rpc('verify_admin_password', { 
-          input_username: username, 
-          input_password: password 
-        });
 
-      if (adminError) {
-        console.error('Admin verification error:', adminError);
-      } else if (adminData && adminData.length > 0) {
-        const admin = adminData[0];
+      // For now, use simple authentication
+      // Admin login: username "admin", password "admin123"
+      if (username === 'admin' && password === 'admin123') {
         const userProfile: UserProfile = {
-          id: admin.admin_id,
-          name: admin.admin_name,
+          id: 'admin-1',
+          name: 'Administrator',
           role: 'admin',
-          email: undefined
+          email: 'admin@school.edu'
         };
         setUser(userProfile);
         localStorage.setItem('library_user', JSON.stringify(userProfile));
         return { success: true };
       }
 
-      // If not admin, try student login (name + admission number)
-      console.log('Attempting student login with:', { username, password });
-      
-      const { data: studentData, error: studentError } = await supabase
-        .from('students')
-        .select('*')
-        .eq('name', username)
-        .eq('admission_number', password)
-        .maybeSingle();
+      // Student login: try to find student by admission number
+      try {
+        const studentsResponse = await fetch(`http://localhost:3001/api/students?admission_number=${encodeURIComponent(password)}`);
 
-      console.log('Student query result:', { studentData, studentError });
+        if (studentsResponse.ok) {
+          const students = await studentsResponse.json();
+          const student = students.find((s: any) => s.admission_number === password && s.name === username);
 
-      if (studentError) {
-        console.error('Student query error:', studentError);
-        return { success: false, error: 'Database error occurred' };
-      }
-
-      if (studentData) {
-        const userProfile: UserProfile = {
-          id: studentData.id,
-          name: studentData.name,
-          role: 'student',
-          admission_number: studentData.admission_number,
-          email: studentData.email
-        };
-        setUser(userProfile);
-        localStorage.setItem('library_user', JSON.stringify(userProfile));
-        return { success: true };
+          if (student) {
+            const userProfile: UserProfile = {
+              id: student.id,
+              name: student.name,
+              role: 'student',
+              admission_number: student.admission_number,
+              email: student.email
+            };
+            setUser(userProfile);
+            localStorage.setItem('library_user', JSON.stringify(userProfile));
+            return { success: true };
+          }
+        }
+      } catch (apiError) {
+        console.error('API error during student login:', apiError);
       }
 
       return { success: false, error: 'Invalid credentials' };

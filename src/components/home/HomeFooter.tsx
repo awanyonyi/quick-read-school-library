@@ -20,7 +20,7 @@ const HomeFooter = () => {
               © 2025 Maryland Senior School. All rights reserved.
             </p>
             <p className="text-xs sm:text-sm text-gray-500">
-              Designed by Allan Wanyonyi
+              Powered by Allan Wanyonyi
             </p>
           </div>
         </div>

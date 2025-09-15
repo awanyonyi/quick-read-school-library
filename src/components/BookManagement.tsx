@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Book } from '../types';
 import { Plus, Edit, Trash2, BookOpen } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { fetchBooks, addBook } from '@/utils/libraryData';
 
 interface BookManagementProps {
@@ -77,18 +76,23 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
 
     try {
       if (editingBook) {
-        // Update existing book
-        const { error } = await supabase
-          .from('books')
-          .update({
+        // Update existing book via API
+        const updateResponse = await fetch(`http://localhost:3001/api/books/${editingBook.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
             title: formData.title,
             author: formData.author,
             category: formData.category,
             total_copies: formData.total_copies,
-          })
-          .eq('id', editingBook.id);
+          }),
+        });
 
-        if (error) throw error;
+        if (!updateResponse.ok) {
+          throw new Error('Failed to update book');
+        }
 
         toast({
           title: "Success",
@@ -110,11 +114,23 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
           });
         }
         
-        const { error } = await supabase
-          .from('books')
-          .insert(newBooks);
+        // Insert new books via API
+        const insertPromises = newBooks.map(book =>
+          fetch('http://localhost:3001/api/books', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(book),
+          })
+        );
 
-        if (error) throw error;
+        const results = await Promise.allSettled(insertPromises);
+        const failedInserts = results.filter(result => result.status === 'rejected');
+
+        if (failedInserts.length > 0) {
+          throw new Error(`${failedInserts.length} book(s) failed to insert`);
+        }
         
         toast({
           title: "Success",
@@ -137,18 +153,19 @@ export const BookManagement: React.FC<BookManagementProps> = ({ onUpdate }) => {
 
   const handleDelete = async (bookId: string) => {
     try {
-      const { error } = await supabase
-        .from('books')
-        .delete()
-        .eq('id', bookId);
+      const deleteResponse = await fetch(`http://localhost:3001/api/books/${bookId}`, {
+        method: 'DELETE',
+      });
 
-      if (error) throw error;
-      
+      if (!deleteResponse.ok) {
+        throw new Error('Failed to delete book');
+      }
+
       toast({
         title: "Success",
         description: "Book deleted successfully"
       });
-      
+
       loadBooks();
       onUpdate();
     } catch (error: any) {

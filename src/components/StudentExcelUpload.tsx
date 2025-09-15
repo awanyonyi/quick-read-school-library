@@ -8,7 +8,6 @@ import { Student } from '../types';
 import { Upload, Download, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
-import { supabase } from '@/integrations/supabase/client';
 
 interface StudentExcelUploadProps {
   onUploadComplete: () => void;
@@ -75,12 +74,10 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
       }
 
       // Get existing students from database
-      const { data: existingStudents, error: fetchError } = await supabase
-        .from('students')
-        .select('admission_number');
+      const existingStudentsResponse = await fetch('http://localhost:3001/api/students');
 
-      if (fetchError) {
-        console.error('Error fetching existing students:', fetchError);
+      if (!existingStudentsResponse.ok) {
+        console.error('Error fetching existing students:', existingStudentsResponse.status);
         toast({
           title: "Database Error",
           description: "Failed to check existing students",
@@ -89,6 +86,8 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
         setIsUploading(false);
         return;
       }
+
+      const existingStudents = await existingStudentsResponse.json();
 
       const newStudents: any[] = [];
       const errors: string[] = [];
@@ -162,29 +161,45 @@ export const StudentExcelUpload: React.FC<StudentExcelUploadProps> = ({ onUpload
 
       console.log('Upload results:', { successCount, errorCount: errors.length, newStudents });
 
-      // Save successful entries to Supabase
+      // Save successful entries to database via API
       if (newStudents.length > 0) {
         console.log('Attempting to save students:', newStudents);
-        const { data, error: insertError } = await supabase
-          .from('students')
-          .insert(newStudents);
 
-        if (insertError) {
-          console.error('Database insert error details:', insertError);
-          console.error('Error code:', insertError.code);
-          console.error('Error message:', insertError.message);
-          console.error('Error details:', insertError.details);
-          console.error('Error hint:', insertError.hint);
+        // Insert students one by one via API
+        const insertPromises = newStudents.map(student =>
+          fetch('http://localhost:3001/api/students', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(student),
+          })
+        );
+
+        try {
+          const results = await Promise.allSettled(insertPromises);
+          const failedInserts = results.filter(result => result.status === 'rejected');
+
+          if (failedInserts.length > 0) {
+            console.error('Some student inserts failed:', failedInserts);
+            toast({
+              title: "Partial Success",
+              description: `${newStudents.length - failedInserts.length} students saved, ${failedInserts.length} failed`,
+              variant: "destructive"
+            });
+          } else {
+            console.log('Successfully saved all students to database');
+          }
+        } catch (error) {
+          console.error('Error saving students:', error);
           toast({
             title: "Database Error",
-            description: `Failed to save students to database: ${insertError.message}`,
+            description: "Failed to save students to database",
             variant: "destructive"
           });
           setIsUploading(false);
           return;
         }
-
-        console.log('Successfully saved students to database:', data);
       }
 
       setUploadResults({

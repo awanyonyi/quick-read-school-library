@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Search, CheckCircle, XCircle } from 'lucide-react';
 import { Student } from '../../types';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 export const StudentSearch: React.FC = () => {
@@ -28,24 +27,19 @@ export const StudentSearch: React.FC = () => {
 
     setIsSearching(true);
     try {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .eq('admission_number', searchQuery.trim())
-        .maybeSingle();
+      const response = await fetch(`http://localhost:3001/api/students?admission_number=${encodeURIComponent(searchQuery.trim())}`);
 
-      if (error) {
-        console.error('Error searching student:', error);
-        toast({
-          title: "Error",
-          description: "Failed to search for student",
-          variant: "destructive"
-        });
-        return;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
+      const students = await response.json();
+
+      // Find the student with matching admission number
+      const student = students.find((s: Student) => s.admission_number === searchQuery.trim());
+
       setSearchResult({
-        student: data,
+        student: student || null,
         searched: true
       });
     } catch (error) {

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { BiometricAuth } from './BiometricAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Shield, CheckCircle, AlertCircle } from 'lucide-react';
 import { Student } from '@/types';
@@ -31,17 +30,15 @@ export const BiometricVerification: React.FC<BiometricVerificationProps> = ({
       const { success, studentId, message } = parsedData;
       
       if (success && studentId) {
-        const { data: student, error } = await supabase
-          .from('students')
-          .select('*')
-          .eq('id', studentId)
-          .single();
+        const studentResponse = await fetch(`http://localhost:3001/api/students/${studentId}`);
 
-        if (error) {
-          console.error('Error fetching student:', error);
+        if (!studentResponse.ok) {
+          console.error('Error fetching student:', studentResponse.status);
           onVerificationError('Database error during verification');
           return;
         }
+
+        const student = await studentResponse.json();
 
         if (student) {
           // Enhanced success feedback with detailed student information

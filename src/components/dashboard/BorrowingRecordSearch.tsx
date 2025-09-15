@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Search, BookOpen, Calendar, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { BorrowRecord } from '../../types';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { calculateFine } from '../../utils/libraryData';
 
@@ -35,21 +34,14 @@ export const BorrowingRecordSearch: React.FC = () => {
     setIsSearching(true);
     try {
       // First find the student
-      const { data: student, error: studentError } = await supabase
-        .from('students')
-        .select('id, name, admission_number')
-        .eq('admission_number', searchQuery.trim())
-        .maybeSingle();
+      const studentResponse = await fetch(`http://localhost:3001/api/students?admission_number=${encodeURIComponent(searchQuery.trim())}`);
 
-      if (studentError) {
-        console.error('Error searching student:', studentError);
-        toast({
-          title: "Error",
-          description: "Failed to search for student",
-          variant: "destructive"
-        });
-        return;
+      if (!studentResponse.ok) {
+        throw new Error(`HTTP error! status: ${studentResponse.status}`);
       }
+
+      const students = await studentResponse.json();
+      const student = students.find((s: any) => s.admission_number === searchQuery.trim());
 
       if (!student) {
         setSearchResult({
@@ -61,25 +53,13 @@ export const BorrowingRecordSearch: React.FC = () => {
       }
 
       // Fetch borrowing records for the student
-      const { data: records, error: recordsError } = await supabase
-        .from('borrow_records')
-        .select(`
-          *,
-          books (title, author, isbn),
-          students (name, admission_number, class)
-        `)
-        .eq('student_id', student.id)
-        .order('borrow_date', { ascending: false });
+      const recordsResponse = await fetch(`http://localhost:3001/api/borrowing?student_id=${student.id}`);
 
-      if (recordsError) {
-        console.error('Error fetching borrowing records:', recordsError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch borrowing records",
-          variant: "destructive"
-        });
-        return;
+      if (!recordsResponse.ok) {
+        throw new Error(`HTTP error! status: ${recordsResponse.status}`);
       }
+
+      const records = await recordsResponse.json();
 
       setSearchResult({
         records: (records || []) as BorrowRecord[],
