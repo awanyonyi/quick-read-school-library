@@ -2,11 +2,11 @@
 -- Run this script to create the database and tables
 
 -- Create database
-CREATE DATABASE school_library;
+CREATE DATABASE IF NOT EXISTS school_library CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE school_library;
 
 -- Students table
-CREATE TABLE students (
+CREATE TABLE IF NOT EXISTS students (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   name VARCHAR(255) NOT NULL,
   admission_number VARCHAR(50) UNIQUE NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE students (
 );
 
 -- Books table (book metadata)
-CREATE TABLE books (
+CREATE TABLE IF NOT EXISTS books (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   title VARCHAR(500) NOT NULL,
   author VARCHAR(255) NOT NULL,
@@ -53,7 +53,7 @@ CREATE TABLE book_copies (
 );
 
 -- Borrow records table
-CREATE TABLE borrow_records (
+CREATE TABLE IF NOT EXISTS borrow_records (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   book_copy_id VARCHAR(36) NOT NULL,
   student_id VARCHAR(36) NOT NULL,

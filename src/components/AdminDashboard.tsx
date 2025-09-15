@@ -97,21 +97,21 @@ const AdminDashboard = () => {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <img
                 src={schoolLogo}
                 alt="School Logo"
-                className="h-14 w-14 object-contain rounded-full border border-gray-300 shadow"
+                className="h-10 w-10 sm:h-14 sm:w-14 object-contain rounded-full border border-gray-300 shadow"
                 style={{ marginBottom: 0 }}
               />
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">Library Admin</h1>
-                <p className="text-sm text-gray-500">Welcome, {user?.name}</p>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">Library Admin</h1>
+                <p className="text-xs sm:text-sm text-gray-500 truncate">Welcome, {user?.name}</p>
               </div>
             </div>
-            <Button onClick={logout} variant="outline" size="sm">
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
+            <Button onClick={logout} variant="outline" size="sm" className="shrink-0">
+              <LogOut className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Logout</span>
             </Button>
           </div>
         </div>
@@ -130,23 +130,24 @@ const AdminDashboard = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="bg-white border-b">
+      <nav className="bg-white border-b overflow-x-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8">
+          <div className="flex space-x-2 sm:space-x-8 min-w-max">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  className={`flex items-center space-x-1 sm:space-x-2 py-3 sm:py-4 px-2 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
                     activeTab === tab.id
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
-                  <span>{tab.label}</span>
+                  <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden xs:inline sm:inline">{tab.label}</span>
+                  <span className="xs:hidden sm:hidden">{tab.label.split(' ')[0]}</span>
                 </button>
               );
             })}

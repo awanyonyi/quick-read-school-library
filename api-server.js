@@ -86,8 +86,22 @@ app.get('/api/books', async (req, res) => {
       res.json(books);
     } else {
       const query = `
-        SELECT * FROM books
-        ORDER BY created_at DESC
+        SELECT
+          b.*,
+          COUNT(bc.id) as total_copies,
+          COUNT(CASE WHEN bc.status = 'available' THEN 1 END) as available_copies,
+          JSON_ARRAYAGG(
+            JSON_OBJECT(
+              'id', bc.id,
+              'isbn', bc.isbn,
+              'status', bc.status,
+              'condition_notes', bc.condition_notes
+            )
+          ) as copies
+        FROM books b
+        LEFT JOIN book_copies bc ON b.id = bc.book_id
+        GROUP BY b.id
+        ORDER BY b.created_at DESC
       `;
       const rows = await executeQuery(query);
       res.json(rows || []);
@@ -100,45 +114,83 @@ app.get('/api/books', async (req, res) => {
 
 app.post('/api/books', async (req, res) => {
   try {
-    const { title, author, isbn, category, total_copies, due_period_value = 24, due_period_unit = 'hours' } = req.body;
+    const { title, author, category, total_copies, due_period_value = 24, due_period_unit = 'hours' } = req.body;
 
-    const query = `
-      INSERT INTO books (
-        id, title, author, isbn, category,
-        total_copies, available_copies,
-        due_period_value, due_period_unit,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-    `;
+    if (!total_copies || total_copies < 1) {
+      return res.status(400).json({ error: 'total_copies must be at least 1' });
+    }
 
-    const bookId = crypto.randomUUID();
-    const values = [
-      bookId,
-      title,
-      author,
-      isbn || null,
-      category || null,
-      total_copies,
-      total_copies, // available_copies starts as total_copies
-      due_period_value,
-      due_period_unit
-    ];
+    // Start transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
 
-    await pool.execute(query, values);
+    try {
+      // Insert book metadata
+      const bookQuery = `
+        INSERT INTO books (
+          id, title, author, category,
+          due_period_value, due_period_unit,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+      `;
 
-    res.json({
-      id: bookId,
-      title,
-      author,
-      isbn,
-      category,
-      total_copies,
-      available_copies: total_copies,
-      due_period_value,
-      due_period_unit,
-      created_at: new Date(),
-      updated_at: new Date()
-    });
+      const bookId = crypto.randomUUID();
+      await connection.execute(bookQuery, [
+        bookId,
+        title,
+        author,
+        category || null,
+        due_period_value,
+        due_period_unit
+      ]);
+
+      // Generate unique ISBNs for each copy
+      const copyInserts = [];
+      const copyIds = [];
+      for (let i = 0; i < total_copies; i++) {
+        const copyId = crypto.randomUUID();
+        // Generate a 13-digit ISBN (simplified - in real world, use proper ISBN generation)
+        const isbn = Math.floor(Math.random() * 9000000000000) + 1000000000000;
+        copyInserts.push([copyId, bookId, isbn.toString(), 'available', null]);
+        copyIds.push(copyId);
+      }
+
+      // Insert book copies
+      const copyQuery = `
+        INSERT INTO book_copies (
+          id, book_id, isbn, status, condition_notes,
+          created_at, updated_at
+        ) VALUES ${copyInserts.map(() => '(?, ?, ?, ?, ?, NOW(), NOW())').join(', ')}
+      `;
+
+      const flattenedValues = copyInserts.flat();
+      await connection.execute(copyQuery, flattenedValues);
+
+      await connection.commit();
+
+      res.json({
+        id: bookId,
+        title,
+        author,
+        category,
+        total_copies,
+        available_copies: total_copies,
+        due_period_value,
+        due_period_unit,
+        copies: copyIds.map((id, index) => ({
+          id,
+          isbn: copyInserts[index][2],
+          status: 'available'
+        })),
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   } catch (error) {
     console.error('Error adding book:', error);
     res.status(500).json({ error: 'Failed to add book' });
@@ -322,7 +374,7 @@ app.get('/api/students/biometric-data', async (req, res) => {
 // Get biometric verification logs
 app.get('/api/biometric-verification', async (req, res) => {
   try {
-    const { student_id, book_id, verification_type, limit = 50 } = req.query;
+    const { student_id, book_copy_id, verification_type, limit = 50 } = req.query;
 
     if (useMockData) {
       // Mock biometric verification logs
@@ -330,7 +382,7 @@ app.get('/api/biometric-verification', async (req, res) => {
         {
           id: 'mock-log-1',
           student_id: student_id || 'mock-student-1',
-          book_id: book_id || null,
+          book_copy_id: book_copy_id || null,
           verification_type: verification_type || 'book_issue',
           verification_method: 'fingerprint',
           verification_status: 'success',
@@ -352,10 +404,12 @@ app.get('/api/biometric-verification', async (req, res) => {
           s.email as student_email,
           bk.title as book_title,
           bk.author as book_author,
-          bk.isbn as book_isbn
+          bc.isbn as book_isbn,
+          bc.id as book_copy_id
         FROM biometric_verification_logs bvl
         LEFT JOIN students s ON bvl.student_id = s.id
-        LEFT JOIN books bk ON bvl.book_id = bk.id
+        LEFT JOIN book_copies bc ON bvl.book_copy_id = bc.id
+        LEFT JOIN books bk ON bc.book_id = bk.id
         WHERE 1=1
       `;
 
@@ -366,9 +420,9 @@ app.get('/api/biometric-verification', async (req, res) => {
         params.push(student_id);
       }
 
-      if (book_id) {
-        query += ' AND bvl.book_id = ?';
-        params.push(book_id);
+      if (book_copy_id) {
+        query += ' AND bvl.book_copy_id = ?';
+        params.push(book_copy_id);
       }
 
       if (verification_type) {
@@ -400,7 +454,7 @@ app.post('/api/biometric-verification', async (req, res) => {
   try {
     const {
       student_id,
-      book_id,
+      book_copy_id,
       verification_type,
       verification_method,
       verification_status,
@@ -414,7 +468,7 @@ app.post('/api/biometric-verification', async (req, res) => {
       // Mock biometric verification logging
       console.log('✅ Biometric verification logged (mock):', {
         student_id,
-        book_id,
+        book_copy_id,
         verification_type,
         verification_status,
         verification_timestamp
@@ -423,7 +477,7 @@ app.post('/api/biometric-verification', async (req, res) => {
     } else {
       const query = `
         INSERT INTO biometric_verification_logs (
-          id, student_id, book_id, verification_type, verification_method,
+          id, student_id, book_copy_id, verification_type, verification_method,
           verification_status, verified_by, verification_timestamp,
           borrow_record_id, additional_data, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
@@ -433,7 +487,7 @@ app.post('/api/biometric-verification', async (req, res) => {
       const values = [
         logId,
         student_id,
-        book_id || null,
+        book_copy_id || null,
         verification_type,
         verification_method,
         verification_status,
@@ -532,12 +586,14 @@ app.get('/api/borrowing', async (req, res) => {
           br.*,
           b.title as book_title,
           b.author as book_author,
-          b.isbn as book_isbn,
+          bc.isbn as book_isbn,
+          bc.id as book_copy_id,
           s.name as student_name,
           s.admission_number as student_admission,
           s.class as student_class
         FROM borrow_records br
-        LEFT JOIN books b ON br.book_id = b.id
+        LEFT JOIN book_copies bc ON br.book_copy_id = bc.id
+        LEFT JOIN books b ON bc.book_id = b.id
         LEFT JOIN students s ON br.student_id = s.id
         ORDER BY br.borrow_date DESC
       `;
@@ -549,7 +605,8 @@ app.get('/api/borrowing', async (req, res) => {
         books: {
           title: row.book_title,
           author: row.book_author,
-          isbn: row.book_isbn
+          isbn: row.book_isbn,
+          copy_id: row.book_copy_id
         },
         students: {
           name: row.student_name,
@@ -568,11 +625,11 @@ app.get('/api/borrowing', async (req, res) => {
 
 app.post('/api/borrowing', async (req, res) => {
   try {
-    const { book_id, student_id, due_period_value = 24, due_period_unit = 'hours' } = req.body;
+    const { book_copy_id, student_id, due_period_value = 24, due_period_unit = 'hours' } = req.body;
 
     if (useMockData) {
       const newRecord = await mockDataProvider.createBorrowRecord({
-        book_id,
+        book_copy_id,
         student_id,
         due_period_value,
         due_period_unit
@@ -615,29 +672,32 @@ app.post('/api/borrowing', async (req, res) => {
         }
       }
 
-      // Check if book is available
-      const bookQuery = `
-        SELECT available_copies, due_period_value, due_period_unit FROM books WHERE id = ?
+      // Check if book copy is available and get due period settings
+      const bookCopyQuery = `
+        SELECT bc.status, b.due_period_value, b.due_period_unit
+        FROM book_copies bc
+        JOIN books b ON bc.book_id = b.id
+        WHERE bc.id = ?
       `;
-      const [bookResult] = await pool.execute(bookQuery, [book_id]);
-      const book = bookResult[0];
+      const [bookCopyResult] = await pool.execute(bookCopyQuery, [book_copy_id]);
+      const bookCopy = bookCopyResult[0];
 
-      if (!book) {
-        return res.status(404).json({ error: 'Book not found' });
+      if (!bookCopy) {
+        return res.status(404).json({ error: 'Book copy not found' });
       }
 
-      if (book.available_copies <= 0) {
-        return res.status(400).json({ error: 'Book is not available for borrowing' });
+      if (bookCopy.status !== 'available') {
+        return res.status(400).json({ error: 'Book copy is not available for borrowing' });
       }
 
       // Calculate due date
       const borrowDate = new Date();
-      const dueDate = calculateDueDate(borrowDate, due_period_value || book.due_period_value || 24, due_period_unit || book.due_period_unit || 'hours');
+      const dueDate = calculateDueDate(borrowDate, due_period_value || bookCopy.due_period_value || 24, due_period_unit || bookCopy.due_period_unit || 'hours');
 
       // Create borrow record
       const insertQuery = `
         INSERT INTO borrow_records (
-          id, book_id, student_id, borrow_date, due_date, status,
+          id, book_copy_id, student_id, borrow_date, due_date, status,
           created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, 'borrowed', NOW(), NOW())
       `;
@@ -645,21 +705,17 @@ app.post('/api/borrowing', async (req, res) => {
       const recordId = crypto.randomUUID();
       await pool.execute(insertQuery, [
         recordId,
-        book_id,
+        book_copy_id,
         student_id,
         borrowDate.toISOString(),
         dueDate.toISOString()
       ]);
 
-      // Update book availability
-      const updateQuery = `
-        UPDATE books SET available_copies = available_copies - 1 WHERE id = ?
-      `;
-      await pool.execute(updateQuery, [book_id]);
+      // The trigger will automatically update the book copy status
 
       res.json({
         id: recordId,
-        book_id,
+        book_copy_id,
         student_id,
         borrow_date: borrowDate.toISOString(),
         due_date: dueDate.toISOString(),
@@ -680,9 +736,9 @@ app.put('/api/borrowing/:recordId/return', async (req, res) => {
       const returnedRecord = await mockDataProvider.returnBook(recordId);
       res.json(returnedRecord);
     } else {
-      // Get the borrow record to get the book_id
+      // Get the borrow record to get the book_copy_id
       const recordQuery = `
-        SELECT book_id FROM borrow_records WHERE id = ?
+        SELECT book_copy_id FROM borrow_records WHERE id = ?
       `;
       const [recordResult] = await pool.execute(recordQuery, [recordId]);
       const borrowRecord = recordResult[0];
@@ -699,15 +755,11 @@ app.put('/api/borrowing/:recordId/return', async (req, res) => {
       `;
       await pool.execute(updateRecordQuery, [recordId]);
 
-      // Increment book availability
-      const updateBookQuery = `
-        UPDATE books SET available_copies = available_copies + 1 WHERE id = ?
-      `;
-      await pool.execute(updateBookQuery, [borrowRecord.book_id]);
+      // The trigger will automatically update the book copy status
 
       res.json({
         id: recordId,
-        book_id: borrowRecord.book_id,
+        book_copy_id: borrowRecord.book_copy_id,
         return_date: new Date().toISOString(),
         status: 'returned'
       });

@@ -188,64 +188,68 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Student Management</h2>
-          <p className="text-gray-600">Manage student registrations and information</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Student Management</h2>
+          <p className="text-sm sm:text-base text-gray-600">Manage student registrations and information</p>
         </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={() => setShowExcelUpload(!showExcelUpload)}>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={() => setShowExcelUpload(!showExcelUpload)} className="w-full sm:w-auto">
             <Upload className="h-4 w-4 mr-2" />
-            {showExcelUpload ? 'Hide' : 'Bulk Upload'}
+            <span className="hidden sm:inline">{showExcelUpload ? 'Hide' : 'Bulk Upload'}</span>
+            <span className="sm:hidden">Upload</span>
           </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => setIsAddDialogOpen(true)}>
+              <Button onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Student
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[425px] mx-4 max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>{editingStudent ? 'Edit Student' : 'Add New Student'}</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-lg sm:text-xl">{editingStudent ? 'Edit Student' : 'Add New Student'}</DialogTitle>
+                <DialogDescription className="text-sm">
                   {editingStudent ? 'Update student information' : 'Register a new student in the library system'}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit}>
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-3 sm:gap-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Full Name *</Label>
+                    <Label htmlFor="name" className="text-sm font-medium">Full Name *</Label>
                     <Input
                       id="name"
                       value={formData.name}
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
                       placeholder="Enter student name"
                       required
+                      className="h-10"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="admission">Admission Number *</Label>
+                    <Label htmlFor="admission" className="text-sm font-medium">Admission Number *</Label>
                     <Input
                       id="admission"
                       value={formData.admission_number}
                       onChange={(e) => setFormData({...formData, admission_number: e.target.value})}
                       placeholder="Enter admission number"
                       required
+                      className="h-10"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="class">Class *</Label>
+                    <Label htmlFor="class" className="text-sm font-medium">Class *</Label>
                     <Input
                       id="class"
                       value={formData.class}
                       onChange={(e) => setFormData({...formData, class: e.target.value})}
                       placeholder="Enter class (e.g., Grade 10A)"
                       required
+                      className="h-10"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
+                    <Label htmlFor="email" className="text-sm font-medium">Email *</Label>
                     <Input
                       id="email"
                       type="email"
@@ -253,14 +257,15 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
                       onChange={(e) => setFormData({...formData, email: e.target.value})}
                       placeholder="Enter email address"
                       required
+                      className="h-10"
                     />
                   </div>
                 </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={resetForm}>
+                <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+                  <Button type="button" variant="outline" onClick={resetForm} className="w-full sm:w-auto">
                     Cancel
                   </Button>
-                  <Button type="submit">
+                  <Button type="submit" className="w-full sm:w-auto">
                     {editingStudent ? 'Update Student' : 'Add Student'}
                   </Button>
                 </DialogFooter>
@@ -285,79 +290,93 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
           <CardDescription>All students registered in the library system</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {students.map((student) => (
-              <div key={student.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
+              <div key={student.id} className="border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-start space-x-3">
-                      <div className="bg-green-100 p-2 rounded-lg">
-                        <User className="h-5 w-5 text-green-600" />
+                      <div className="bg-green-100 p-2 rounded-lg flex-shrink-0">
+                        <User className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                       </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg">{student.name}</h3>
-                        <p className="text-gray-600">{student.email}</p>
-                        <div className="flex items-center space-x-4 mt-2">
-                          <span className="text-sm">
-                            Admission: <span className="font-medium">{student.admission_number}</span>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base sm:text-lg truncate">{student.name}</h3>
+                        <p className="text-gray-600 text-sm truncate">{student.email}</p>
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2">
+                          <span className="text-xs sm:text-sm">
+                            <span className="sm:hidden">Adm:</span>
+                            <span className="hidden sm:inline">Admission:</span>
+                            <span className="font-medium ml-1">{student.admission_number}</span>
                           </span>
-                          <span className="text-sm">
+                          <span className="text-xs sm:text-sm">
                             Class: <span className="font-medium">{student.class}</span>
                           </span>
-                           <span className="text-sm text-gray-500">
-                             Registered: {new Date(student.created_at || '').toLocaleDateString()}
-                           </span>
-                           {student.biometric_enrolled && (
-                             <div className="flex items-center gap-1 mt-1">
-                               <Shield className="h-3 w-3 text-green-600" />
-                               <span className="text-xs text-green-600 font-medium">Biometric Enrolled</span>
-                             </div>
-                           )}
-                         </div>
-                       </div>
-                     </div>
-                   </div>
-                   <div className="flex space-x-2">
-                     {!student.biometric_enrolled && (
-                       <Button 
-                         variant="outline" 
-                         size="sm" 
-                         onClick={() => openBiometricEnrollment(student)}
-                         className="text-blue-600 hover:text-blue-700"
-                       >
-                         <Fingerprint className="h-4 w-4" />
-                       </Button>
-                     )}
-                     <Button variant="outline" size="sm" onClick={() => openEditDialog(student)}>
-                       <Edit className="h-4 w-4" />
-                     </Button>
-                     <Button 
-                       variant="outline" 
-                       size="sm" 
-                       onClick={() => handleDelete(student.id)}
-                       className="text-red-600 hover:text-red-700"
-                     >
-                       <Trash2 className="h-4 w-4" />
-                     </Button>
-                   </div>
+                          <span className="text-xs sm:text-sm text-gray-500 hidden sm:inline">
+                            Registered: {new Date(student.created_at || '').toLocaleDateString()}
+                          </span>
+                          {student.biometric_enrolled && (
+                            <div className="flex items-center gap-1">
+                              <Shield className="h-3 w-3 text-green-600" />
+                              <span className="text-xs text-green-600 font-medium hidden sm:inline">Biometric Enrolled</span>
+                              <span className="text-xs text-green-600 font-medium sm:hidden">Bio</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 sm:hidden mt-1">
+                          {new Date(student.created_at || '').toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex space-x-1 sm:space-x-2 w-full sm:w-auto justify-end">
+                    {!student.biometric_enrolled && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openBiometricEnrollment(student)}
+                        className="text-blue-600 hover:text-blue-700 flex-1 sm:flex-none"
+                      >
+                        <Fingerprint className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="hidden sm:inline ml-1">Enroll</span>
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(student)}
+                      className="flex-1 sm:flex-none"
+                    >
+                      <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline ml-1">Edit</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(student.id)}
+                      className="text-red-600 hover:text-red-700 flex-1 sm:flex-none"
+                    >
+                      <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline ml-1">Delete</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
             {students.length === 0 && (
-              <div className="text-center py-12">
-                <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 mb-4">No students registered yet</p>
-                <div className="flex justify-center space-x-2">
-                  <Button onClick={() => setShowExcelUpload(true)} variant="outline">
+              <div className="text-center py-8 sm:py-12">
+                <User className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500 mb-4 text-sm sm:text-base">No students registered yet</p>
+                <div className="flex flex-col sm:flex-row justify-center gap-2 sm:space-x-2">
+                  <Button onClick={() => setShowExcelUpload(true)} variant="outline" className="w-full sm:w-auto">
                     <Upload className="h-4 w-4 mr-2" />
                     Bulk Upload
                   </Button>
-                  <Button onClick={() => setIsAddDialogOpen(true)}>
+                  <Button onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Your First Student
                   </Button>
                 </div>
-                </div>
+              </div>
             )}
           </div>
         </CardContent>

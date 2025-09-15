@@ -110,3 +110,91 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile-specific improvements */
+@layer utilities {
+  /* Ensure minimum touch target sizes */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Better mobile scrolling */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  /* Hide scrollbars on mobile but keep functionality */
+  .mobile-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Improved focus states for mobile */
+  .focus-mobile:focus {
+    @apply outline-none ring-2 ring-blue-500 ring-offset-2;
+  }
+
+  /* Better text selection on mobile */
+  .mobile-text-select {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
+}
+
+/* Mobile responsive improvements */
+@media (max-width: 640px) {
+  /* Increase button sizes for better touch targets */
+  .btn-mobile {
+    @apply min-h-[44px] px-4 py-2 text-base;
+  }
+
+  /* Better spacing for mobile cards */
+  .card-mobile {
+    @apply p-4 space-y-3;
+  }
+
+  /* Improved form inputs for mobile */
+  .input-mobile {
+    @apply h-12 text-base;
+  }
+
+  /* Better modal sizing for mobile */
+  .modal-mobile {
+    @apply mx-4 max-h-[90vh] overflow-y-auto;
+  }
+
+  /* Improved navigation for mobile */
+  .nav-mobile {
+    @apply overflow-x-auto;
+  }
+
+  .nav-mobile::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  /* Remove hover effects on touch devices */
+  .hover-touch:hover {
+    @apply transform-none shadow-none;
+  }
+
+  /* Better active states for touch */
+  .active-touch:active {
+    @apply scale-95 transition-transform;
+  }
+}
+
+/* Safe area support for devices with notches */
+@supports (padding: max(0px)) {
+  .safe-area-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+
+  .safe-area-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
