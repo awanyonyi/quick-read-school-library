@@ -180,7 +180,7 @@ app.get('/api/books/search', async (req, res) => {
 
 app.post('/api/books', async (req, res) => {
   try {
-    const { title, author, category, total_copies, due_period_value = 24, due_period_unit = 'hours' } = req.body;
+    const { title, author, category, total_copies, isbn, due_period_value = 24, due_period_unit = 'hours' } = req.body;
 
     if (!total_copies || total_copies < 1) {
       return res.status(400).json({ error: 'total_copies must be at least 1' });
@@ -210,15 +210,26 @@ app.post('/api/books', async (req, res) => {
         due_period_unit
       ]);
 
-      // Generate unique ISBNs for each copy
+      // Use provided ISBN or generate unique ones for each copy
       const copyInserts = [];
       const copyIds = [];
 
       for (let i = 0; i < total_copies; i++) {
         const copyId = crypto.randomUUID();
-        const isbn = await generateUniqueISBN();
+        let copyIsbn;
 
-        copyInserts.push([copyId, bookId, isbn, 'available', null]);
+        if (isbn && i === 0) {
+          // Use provided ISBN for first copy
+          copyIsbn = isbn;
+        } else if (isbn) {
+          // For additional copies with provided ISBN, append copy number
+          copyIsbn = `${isbn}-${i + 1}`;
+        } else {
+          // Generate unique ISBN if none provided
+          copyIsbn = await generateUniqueISBN();
+        }
+
+        copyInserts.push([copyId, bookId, copyIsbn, 'available', null]);
         copyIds.push(copyId);
       }
 
@@ -655,6 +666,110 @@ app.put('/api/students/:studentId/biometric', async (req, res) => {
   }
 });
 
+// Biometric verification route
+app.post('/api/biometric/verify', async (req, res) => {
+  try {
+    const { fingerprint } = req.body;
+
+    if (!fingerprint) {
+      return res.status(400).json({ error: 'Missing fingerprint data' });
+    }
+
+    if (useMockData) {
+      // Mock verification - return first enrolled student
+      const students = await mockDataProvider.fetchStudents();
+      const enrolledStudent = students.find(s => s.biometric_enrolled);
+
+      if (enrolledStudent) {
+        return res.json({
+          success: true,
+          studentId: enrolledStudent.id,
+          message: 'Biometric verification successful (mock)'
+        });
+      } else {
+        return res.status(401).json({
+          success: false,
+          message: 'No enrolled biometric data found'
+        });
+      }
+    } else {
+      // Fetch all enrolled students with biometric data
+      const query = `
+        SELECT id, name, admission_number, class, biometric_data
+        FROM students
+        WHERE biometric_enrolled = true AND biometric_data IS NOT NULL
+      `;
+
+      const [rows] = await pool.execute(query);
+
+      if (rows.length === 0) {
+        return res.status(401).json({
+          success: false,
+          message: 'No enrolled biometric data found'
+        });
+      }
+
+      // Compare fingerprint against enrolled data
+      // Note: This is a simplified comparison. In production, use proper biometric matching algorithms
+      let matchedStudent = null;
+
+      for (const student of rows) {
+        try {
+          const biometricData = JSON.parse(student.biometric_data);
+
+          // Simple comparison - check if fingerprint data matches
+          // In production, this would use DigitalPersona SDK or similar for proper matching
+          if (biometricData && biometricData.fingerprint === fingerprint) {
+            matchedStudent = student;
+            break;
+          }
+
+          // Alternative: check biometric_id match
+          if (biometricData && biometricData.biometricId && biometricData.biometricId === fingerprint) {
+            matchedStudent = student;
+            break;
+          }
+        } catch (parseError) {
+          console.warn(`Failed to parse biometric data for student ${student.id}:`, parseError);
+          continue;
+        }
+      }
+
+      if (matchedStudent) {
+        // Log successful verification
+        await pool.execute(`
+          INSERT INTO biometric_verification_logs (
+            id, student_id, verification_type, verification_method,
+            verification_status, verified_by, verification_timestamp,
+            additional_data, created_at, updated_at
+          ) VALUES (?, ?, 'verification', 'fingerprint', 'success', 'system', NOW(), ?, NOW(), NOW())
+        `, [
+          crypto.randomUUID(),
+          matchedStudent.id,
+          JSON.stringify({ fingerprint_length: fingerprint.length })
+        ]);
+
+        return res.json({
+          success: true,
+          studentId: matchedStudent.id,
+          message: 'Biometric verification successful'
+        });
+      } else {
+        // Log failed verification attempt (without student_id since we don't know who it is)
+        console.log('Biometric verification failed: fingerprint not recognized');
+
+        return res.status(401).json({
+          success: false,
+          message: 'Fingerprint not recognized'
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error during biometric verification:', error);
+    res.status(500).json({ error: 'Biometric verification failed' });
+  }
+});
+
 // Borrowing routes
 app.get('/api/borrowing', async (req, res) => {
   try {
@@ -753,9 +868,20 @@ app.post('/api/borrowing', async (req, res) => {
         }
       }
 
-      // Check if book copy is available and get due period settings
+      // Get student details
+      const getStudentDetailsQuery = `
+        SELECT name, admission_number, class FROM students WHERE id = ?
+      `;
+      const [studentDetailsResult] = await pool.execute(getStudentDetailsQuery, [student_id]);
+      const studentDetails = studentDetailsResult[0];
+
+      if (!studentDetails) {
+        return res.status(404).json({ error: 'Student not found' });
+      }
+
+      // Check if book copy is available and get book details
       const bookCopyQuery = `
-        SELECT bc.status, b.due_period_value, b.due_period_unit
+        SELECT bc.status, b.title, b.author, bc.isbn, b.due_period_value, b.due_period_unit
         FROM book_copies bc
         JOIN books b ON bc.book_id = b.id
         WHERE bc.id = ?
@@ -775,12 +901,19 @@ app.post('/api/borrowing', async (req, res) => {
       const borrowDate = new Date();
       const dueDate = calculateDueDate(borrowDate, due_period_value || bookCopy.due_period_value || 24, due_period_unit || bookCopy.due_period_unit || 'hours');
 
-      // Create borrow record
+      // Format dates for MySQL (YYYY-MM-DD HH:mm:ss)
+      const formatDateForMySQL = (date) => {
+        return date.toISOString().slice(0, 19).replace('T', ' ');
+      };
+
+      // Create borrow record with denormalized data
       const insertQuery = `
         INSERT INTO borrow_records (
           id, book_copy_id, student_id, borrow_date, due_date, status,
+          student_name, student_admission_number, student_class,
+          book_title, book_author, book_isbn,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 'borrowed', NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, 'borrowed', ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `;
 
       const recordId = crypto.randomUUID();
@@ -788,8 +921,14 @@ app.post('/api/borrowing', async (req, res) => {
         recordId,
         book_copy_id,
         student_id,
-        borrowDate.toISOString(),
-        dueDate.toISOString()
+        formatDateForMySQL(borrowDate),
+        formatDateForMySQL(dueDate),
+        studentDetails.name,
+        studentDetails.admission_number,
+        studentDetails.class,
+        bookCopy.title,
+        bookCopy.author,
+        bookCopy.isbn
       ]);
 
       // The trigger will automatically update the book copy status

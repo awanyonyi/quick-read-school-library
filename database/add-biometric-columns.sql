@@ -3,7 +3,7 @@
 
 ALTER TABLE students ADD biometric_enrolled BOOLEAN DEFAULT FALSE;
 ALTER TABLE students ADD biometric_id VARCHAR(255);
-ALTER TABLE students ADD UNIQUE (biometric_id);
+ALTER TABLE students ADD CONSTRAINT uk_biometric_id UNIQUE (biometric_id);
 ALTER TABLE students ADD biometric_data TEXT;
 
 -- Add index for biometric_id for better performance

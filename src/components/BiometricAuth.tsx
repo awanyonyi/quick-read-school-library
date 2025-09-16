@@ -157,7 +157,7 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
       });
 
     // Subscribe to samples
-    reader.onSamplesAcquired = (samples) => {
+    reader.onSamplesAcquired = async (samples) => {
       try {
         console.log("Samples received:", samples);
         console.log("Samples type:", typeof samples);
@@ -244,17 +244,53 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
           throw new Error("No fingerprint data found in any supported format");
         }
 
-        const biometricPayload = {
-          studentId: effectiveStudentId,
-          biometricId: `${effectiveStudentId}-${Date.now()}`,
-          fingerprint: fingerprintImage,
-          mode,
-          timestamp: new Date().toISOString(),
-        };
+        if (mode === 'verify') {
+          // For verification mode, send fingerprint to verification service
+          try {
+            console.log("🔍 Sending fingerprint for verification...");
+            const response = await fetch('http://localhost:3001/api/biometric/verify', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ fingerprint: fingerprintImage }),
+            });
 
-        console.log("✅ Biometric payload created successfully");
-        onAuthSuccess(JSON.stringify(biometricPayload));
-        setStatus("Fingerprint captured successfully!");
+            const result = await response.json();
+
+            if (result.success) {
+              console.log("✅ Biometric verification successful for student:", result.studentId);
+              const verificationPayload = {
+                success: true,
+                studentId: result.studentId,
+                message: result.message,
+                timestamp: new Date().toISOString(),
+              };
+              onAuthSuccess(JSON.stringify(verificationPayload));
+              setStatus("Verification successful!");
+            } else {
+              console.log("❌ Biometric verification failed:", result.message);
+              onAuthError(result.message || "Verification failed");
+              setStatus("Verification failed. Please try again.");
+            }
+          } catch (verifyError) {
+            console.error("Verification request failed:", verifyError);
+            onAuthError("Verification service unavailable");
+            setStatus("Verification service error.");
+          }
+        } else {
+          // For enrollment mode, return the captured fingerprint
+          const biometricPayload = {
+            biometricId: `${effectiveStudentId}-${Date.now()}`,
+            fingerprint: fingerprintImage,
+            timestamp: new Date().toISOString(),
+          };
+
+          console.log("✅ Biometric data captured for enrollment");
+          onAuthSuccess(JSON.stringify(biometricPayload));
+          setStatus("Fingerprint captured successfully!");
+        }
+
         reader.stopAcquisition();
       } catch (err: any) {
         console.error("Sample processing error:", err);

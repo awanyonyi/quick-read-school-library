@@ -31,6 +31,7 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
         Title: 'The Great Gatsby',
         Author: 'F. Scott Fitzgerald',
         Category: 'Language',
+        ISBN: '9780743273565',
         'Total Copies': 3,
         'Due Period Value': 14,
         'Due Period Unit': 'days'
@@ -39,6 +40,7 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
         Title: 'Introduction to Physics',
         Author: 'John Smith',
         Category: 'Science',
+        ISBN: '', // Leave blank for auto-generation
         'Total Copies': 2,
         'Due Period Value': 7,
         'Due Period Unit': 'days'
@@ -55,6 +57,7 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
       { width: 25 }, // Title
       { width: 20 }, // Author
       { width: 20 }, // Category
+      { width: 18 }, // ISBN
       { width: 15 }, // Total Copies
       { width: 18 }, // Due Period Value
       { width: 18 }  // Due Period Unit
@@ -74,14 +77,15 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
       
       // ES6: Enhanced grouping with destructuring and default values
       const groupedBooks = books.reduce((acc, book) => {
-        const { title, author, category, due_period_value = 24, due_period_unit = 'hours' } = book;
+        const { title, author, category, isbn, due_period_value = 24, due_period_unit = 'hours' } = book;
         const key = `${title}-${author}`;
-        
+
         if (!acc[key]) {
           acc[key] = {
             Title: title,
             Author: author,
             Category: category,
+            ISBN: isbn || '',
             'Total Copies': 0,
             'Due Period Value': due_period_value,
             'Due Period Unit': due_period_unit
@@ -112,6 +116,7 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
         { width: 25 }, // Title
         { width: 20 }, // Author
         { width: 20 }, // Category
+        { width: 18 }, // ISBN
         { width: 15 }, // Total Copies
         { width: 18 }, // Due Period Value
         { width: 18 }  // Due Period Unit
@@ -227,35 +232,26 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
         }
 
         try {
-          // Add each copy as a separate book record
-          for (let copy = 0; copy < totalCopies; copy++) {
-            const isbn = generateUniqueISBN([...existingBooks]);
-            
-            await addBook({
+          // Get ISBN from Excel or generate unique ones
+          const providedISBN = row.ISBN ? row.ISBN.toString().trim() : '';
+
+          // Use the new API that accepts ISBN input
+          await fetch('http://localhost:3001/api/books', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
               title: row.Title.trim(),
               author: row.Author.trim(),
-              isbn,
               category: row.Category.trim(),
-              total_copies: 1, // Each record represents one copy
+              isbn: providedISBN || undefined, // Use provided ISBN or let API auto-generate
+              total_copies: totalCopies,
               due_period_value: duePeriodValue,
               due_period_unit: duePeriodUnit
-            });
-            
-            // Add to existing books to avoid ISBN conflicts
-            existingBooks.push({
-              id: '',
-              title: row.Title.trim(),
-              author: row.Author.trim(),
-              isbn,
-              category: row.Category.trim(),
-              total_copies: 1,
-              available_copies: 1,
-              due_period_value: duePeriodValue,
-              due_period_unit: duePeriodUnit,
-              created_at: new Date().toISOString()
-            });
-          }
-          
+            }),
+          });
+
           successCount += totalCopies;
         } catch (error) {
           console.error(`Error adding book from row ${rowNum}:`, error);
@@ -318,7 +314,7 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            Template includes sample data with all required fields: Title, Author, Category, Total Copies, Due Period Value, and Due Period Unit.
+            Template includes sample data with all fields: Title, Author, Category, ISBN (optional), Total Copies, Due Period Value, and Due Period Unit.
           </p>
         </CardContent>
       </Card>
@@ -355,9 +351,10 @@ export default function BookExcelManager({ onUploadComplete }: BookExcelManagerP
 
           <div className="text-sm text-muted-foreground space-y-2">
             <p><strong>Required columns:</strong> Title, Author, Category, Total Copies</p>
-            <p><strong>Optional columns:</strong> Due Period Value, Due Period Unit</p>
+            <p><strong>Optional columns:</strong> ISBN, Due Period Value, Due Period Unit</p>
             <p><strong>Valid Categories:</strong> Science, Language, Technicals and Applied, Humanities, Maths</p>
             <p><strong>Valid Period Units:</strong> hours, days, weeks, months, years</p>
+            <p><strong>ISBN:</strong> Leave blank for auto-generation or enter custom ISBN</p>
           </div>
         </CardContent>
       </Card>

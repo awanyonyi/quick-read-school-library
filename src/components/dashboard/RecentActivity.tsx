@@ -23,22 +23,23 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({
       <CardContent>
         <div className="space-y-4">
           {borrowRecords.slice(-5).reverse().map((record, index) => {
-            const book = books.find(b => b.id === record.book_id);
-            const student = students.find(s => s.id === record.student_id);
             return (
-              <div 
-                key={record.id} 
+              <div
+                key={record.id}
                 className="flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-shadow animate-fade-in"
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
                 <div className="flex-1">
-                  <h4 className="font-medium">{book?.title || 'Unknown Book'}</h4>
+                  <h4 className="font-medium">{record.book_title || record.books?.title || 'Unknown Book'}</h4>
                   <p className="text-sm text-gray-500">
-                    Borrowed by {student?.name || 'Unknown Student'}
+                    Borrowed by {record.student_name || record.students?.name || 'Unknown Student'}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    ISBN: {record.book_isbn || record.books?.isbn || 'N/A'}
                   </p>
                 </div>
                 <div className="text-right">
-                  <Badge 
+                  <Badge
                     variant={record.status === 'overdue' ? 'destructive' : 'default'}
                     className="animate-scale-in"
                   >
@@ -46,6 +47,9 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({
                   </Badge>
                   <p className="text-xs text-gray-500 mt-1">
                     {new Date(record.borrow_date).toLocaleDateString()}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Due: {new Date(record.due_date).toLocaleDateString()}
                   </p>
                 </div>
               </div>
