@@ -1,6 +1,45 @@
 import { Request, Response } from 'express';
 import pool, { executeQuery } from '../config/mysql';
 
+// Search books by ISBN, title, or author
+export const searchBooks = async (req: Request, res: Response) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || typeof q !== 'string') {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    const searchTerm = `%${q}%`;
+
+    const query = `
+      SELECT
+        b.*,
+        COUNT(bc.id) as total_copies,
+        COUNT(CASE WHEN bc.status = 'available' THEN 1 END) as available_copies,
+        JSON_ARRAYAGG(
+          JSON_OBJECT(
+            'id', bc.id,
+            'isbn', bc.isbn,
+            'status', bc.status,
+            'condition_notes', bc.condition_notes
+          )
+        ) as copies
+      FROM books b
+      LEFT JOIN book_copies bc ON b.id = bc.book_id
+      WHERE b.title LIKE ? OR b.author LIKE ? OR bc.isbn LIKE ?
+      GROUP BY b.id
+      ORDER BY b.created_at DESC
+    `;
+
+    const rows = await executeQuery(query, [searchTerm, searchTerm, searchTerm]);
+    res.json(rows || []);
+  } catch (error) {
+    console.error('Error searching books:', error);
+    res.status(500).json({ error: 'Failed to search books' });
+  }
+};
+
 // Get all books with copy information
 export const getBooks = async (req: Request, res: Response) => {
   try {

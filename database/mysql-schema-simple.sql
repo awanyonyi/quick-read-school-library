@@ -15,6 +15,10 @@ CREATE TABLE students (
   blacklisted BOOLEAN DEFAULT FALSE,
   blacklist_until DATETIME NULL,
   blacklist_reason TEXT,
+  -- Biometric fields
+  biometric_enrolled BOOLEAN DEFAULT FALSE,
+  biometric_id VARCHAR(255) UNIQUE,
+  biometric_data TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

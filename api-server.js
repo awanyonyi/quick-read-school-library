@@ -76,6 +76,34 @@ const executeQuery = async (query, params = []) => {
   }
 };
 
+// Generate unique 8-digit ISBN
+const generateUniqueISBN = async () => {
+  let isbn;
+  let attempts = 0;
+  const maxAttempts = 100; // Prevent infinite loops
+
+  do {
+    // Generate 8-digit number (10000000 to 99999999)
+    isbn = Math.floor(Math.random() * 90000000) + 10000000;
+    attempts++;
+
+    if (attempts >= maxAttempts) {
+      throw new Error('Could not generate unique ISBN after maximum attempts');
+    }
+
+    // Check if ISBN already exists in database
+    const existingQuery = 'SELECT COUNT(*) as count FROM book_copies WHERE isbn = ?';
+    const existingResult = await executeQuery(existingQuery, [isbn.toString()]);
+    const exists = existingResult[0]?.count > 0;
+
+    if (!exists) {
+      break; // ISBN is unique
+    }
+  } while (true);
+
+  return isbn.toString();
+};
+
 // API Routes
 
 // Books routes
@@ -109,6 +137,44 @@ app.get('/api/books', async (req, res) => {
   } catch (error) {
     console.error('Error fetching books:', error);
     res.status(500).json({ error: 'Failed to fetch books' });
+  }
+});
+
+app.get('/api/books/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || typeof q !== 'string') {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    const searchTerm = `%${q}%`;
+
+    const query = `
+      SELECT
+        b.*,
+        COUNT(bc.id) as total_copies,
+        COUNT(CASE WHEN bc.status = 'available' THEN 1 END) as available_copies,
+        JSON_ARRAYAGG(
+          JSON_OBJECT(
+            'id', bc.id,
+            'isbn', bc.isbn,
+            'status', bc.status,
+            'condition_notes', bc.condition_notes
+          )
+        ) as copies
+      FROM books b
+      LEFT JOIN book_copies bc ON b.id = bc.book_id
+      WHERE b.title LIKE ? OR b.author LIKE ? OR bc.isbn LIKE ?
+      GROUP BY b.id
+      ORDER BY b.created_at DESC
+    `;
+
+    const rows = await executeQuery(query, [searchTerm, searchTerm, searchTerm]);
+    res.json(rows || []);
+  } catch (error) {
+    console.error('Error searching books:', error);
+    res.status(500).json({ error: 'Failed to search books' });
   }
 });
 
@@ -147,11 +213,12 @@ app.post('/api/books', async (req, res) => {
       // Generate unique ISBNs for each copy
       const copyInserts = [];
       const copyIds = [];
+
       for (let i = 0; i < total_copies; i++) {
         const copyId = crypto.randomUUID();
-        // Generate a 13-digit ISBN (simplified - in real world, use proper ISBN generation)
-        const isbn = Math.floor(Math.random() * 9000000000000) + 1000000000000;
-        copyInserts.push([copyId, bookId, isbn.toString(), 'available', null]);
+        const isbn = await generateUniqueISBN();
+
+        copyInserts.push([copyId, bookId, isbn, 'available', null]);
         copyIds.push(copyId);
       }
 
@@ -350,20 +417,26 @@ app.get('/api/students/biometric-data', async (req, res) => {
       }));
       res.json(biometricStudents);
     } else {
-      const query = `
-        SELECT id, name, biometric_data
-        FROM students
-        WHERE biometric_enrolled = true AND biometric_data IS NOT NULL
-      `;
-      const rows = await executeQuery(query);
+      try {
+        const query = `
+          SELECT id, name, biometric_data
+          FROM students
+          WHERE biometric_enrolled = true AND biometric_data IS NOT NULL
+        `;
+        const rows = await executeQuery(query);
 
-      // Parse biometric_data JSON
-      const biometricStudents = rows.map(row => ({
-        ...row,
-        biometric_data: row.biometric_data ? JSON.parse(row.biometric_data) : null
-      }));
+        // Parse biometric_data JSON
+        const biometricStudents = rows.map(row => ({
+          ...row,
+          biometric_data: row.biometric_data ? JSON.parse(row.biometric_data) : null
+        }));
 
-      res.json(biometricStudents || []);
+        res.json(biometricStudents || []);
+      } catch (columnError) {
+        // If biometric columns don't exist, return empty array
+        console.warn('Biometric columns not found, returning empty array:', columnError.message);
+        res.json([]);
+      }
     }
   } catch (error) {
     console.error('Error fetching biometric data:', error);
@@ -540,33 +613,41 @@ app.put('/api/students/:studentId/biometric', async (req, res) => {
         message: 'Biometric data updated successfully (mock)'
       });
     } else {
-      const query = `
-        UPDATE students
-        SET
-          biometric_enrolled = ?,
-          biometric_id = ?,
-          biometric_data = ?,
-          updated_at = NOW()
-        WHERE id = ?
-      `;
+      try {
+        const query = `
+          UPDATE students
+          SET
+            biometric_enrolled = ?,
+            biometric_id = ?,
+            biometric_data = ?,
+            updated_at = NOW()
+          WHERE id = ?
+        `;
 
-      const values = [
-        biometric_enrolled,
-        biometric_id || null,
-        biometric_data ? JSON.stringify(biometric_data) : null,
-        studentId
-      ];
+        const values = [
+          biometric_enrolled,
+          biometric_id || null,
+          biometric_data ? JSON.stringify(biometric_data) : null,
+          studentId
+        ];
 
-      const [result] = await pool.execute(query, values);
+        const [result] = await pool.execute(query, values);
 
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ error: 'Student not found' });
+        if (result.affectedRows === 0) {
+          return res.status(404).json({ error: 'Student not found' });
+        }
+
+        res.json({
+          success: true,
+          message: 'Biometric data updated successfully'
+        });
+      } catch (columnError) {
+        // If biometric columns don't exist, return appropriate error
+        console.warn('Biometric columns not found:', columnError.message);
+        res.status(501).json({
+          error: 'Biometric functionality not available - database schema needs to be updated'
+        });
       }
-
-      res.json({
-        success: true,
-        message: 'Biometric data updated successfully'
-      });
     }
   } catch (error) {
     console.error('Error updating biometric data:', error);
