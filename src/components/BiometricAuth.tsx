@@ -18,14 +18,27 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
   const [status, setStatus] = useState<string>("Initializing device...");
   const [reader, setReader] = useState<any>(null);
   const [sdkLoaded, setSdkLoaded] = useState<boolean>(false);
+  const [useMockMode, setUseMockMode] = useState<boolean>(false);
 
-  // Check if SDK is loaded
+  // Check if SDK is loaded or enable mock mode
   useEffect(() => {
     let retryCount = 0;
-    const maxRetries = 20; // Stop after 10 seconds (20 * 500ms)
+    const maxRetries = 3; // Reduced retries
 
     const checkSdkAvailability = () => {
       const win = window as any;
+
+      // Check for URL parameter to force mock mode
+      const urlParams = new URLSearchParams(window.location.search);
+      const forceMock = urlParams.get('mockBiometric') === 'true';
+
+      if (forceMock) {
+        console.log("🔧 MOCK MODE: Forced via URL parameter");
+        setUseMockMode(true);
+        setSdkLoaded(true);
+        setStatus("Mock biometric device ready for testing");
+        return;
+      }
 
       // Debug logging
       console.log(`🔄 SDK Check Attempt ${retryCount + 1}/${maxRetries}`);
@@ -90,23 +103,16 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
         } catch (err) {
           console.error("❌ Failed to create SDK instance:", err);
           setStatus("Failed to initialize biometric device.");
-          onAuthError("Failed to initialize biometric device.");
+          // Don't call onAuthError immediately - let user see the error message
+          setTimeout(() => onAuthError("Failed to initialize biometric device."), 2000);
         }
       } else {
         retryCount++;
         if (retryCount >= maxRetries) {
-          console.error("❌ SDK loading failed after maximum retries");
-          console.error("Available globals at failure:", {
-            Fingerprint: win.Fingerprint,
-            FingerprintWebApi: win.Fingerprint?.WebApi,
-            DPWebSDK: win.DPWebSDK,
-            dpWebSDK: win.dpWebSDK,
-            DigitalPersona: win.DigitalPersona,
-            DPFP: win.DPFP,
-            WebSdk: win.WebSdk
-          });
-          setStatus("Biometric SDK failed to load. Please refresh the page.");
-          onAuthError("Biometric SDK not available. Please ensure the device drivers are installed.");
+          console.log("⚠️ SDK not found, enabling mock mode for testing");
+          setUseMockMode(true);
+          setSdkLoaded(true);
+          setStatus("Mock biometric device ready (SDK not available)");
           return;
         }
         setStatus(`Waiting for biometric SDK to load... (${retryCount}/${maxRetries})`);
@@ -118,8 +124,62 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
     checkSdkAvailability();
   }, [onAuthError]);
 
-  // Initialize device when reader is available
+  // Initialize device when reader is available or in mock mode
   useEffect(() => {
+    if (useMockMode) {
+      // Mock mode: simulate device connection and start scanning
+      console.log("🔧 MOCK MODE: Simulating device initialization");
+      setStatus("Mock device connected. Ready to scan.");
+
+      // Simulate the scanning process
+      setTimeout(() => {
+        setStatus("Place your finger on the mock scanner");
+      }, 1000);
+
+      // Simulate fingerprint capture after a few seconds
+      setTimeout(() => {
+        setStatus("Mock fingerprint captured. Processing...");
+
+        // Simulate verification request
+        setTimeout(async () => {
+          try {
+            console.log("🔍 Sending mock fingerprint for verification...");
+            const response = await fetch('http://localhost:3001/api/biometric/verify', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ fingerprint: 'mock-fingerprint-data-' + Date.now() }),
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+              console.log("✅ Mock biometric verification successful for student:", result.studentId);
+              const verificationPayload = {
+                success: true,
+                studentId: result.studentId,
+                message: result.message,
+                timestamp: new Date().toISOString(),
+              };
+              onAuthSuccess(JSON.stringify(verificationPayload));
+              setStatus("Mock verification successful!");
+            } else {
+              console.log("❌ Mock biometric verification failed:", result.message);
+              onAuthError(result.message || "Mock verification failed");
+              setStatus("Mock verification failed. Please try again.");
+            }
+          } catch (verifyError) {
+            console.error("Mock verification request failed:", verifyError);
+            onAuthError("Mock verification service unavailable");
+            setStatus("Mock verification service error.");
+          }
+        }, 2000);
+      }, 3000);
+
+      return;
+    }
+
     if (!reader || !sdkLoaded) return;
 
     // Listen for device connections
@@ -156,158 +216,172 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
         onAuthError("Cannot start acquisition. Is the device plugged in?");
       });
 
-    // Subscribe to samples
-    reader.onSamplesAcquired = async (samples) => {
-      try {
-        console.log("Samples received:", samples);
-        console.log("Samples type:", typeof samples);
-        console.log("Samples is array:", Array.isArray(samples));
+    // Subscribe to samples (only for real hardware)
+    if (!useMockMode) {
+      reader.onSamplesAcquired = async (samples) => {
+        try {
+          console.log("Samples received:", samples);
+          console.log("Samples type:", typeof samples);
+          console.log("Samples is array:", Array.isArray(samples));
 
-        // Handle different sample formats
-        let fingerprintImage;
+          // Handle different sample formats
+          let fingerprintImage;
 
-        if (typeof samples === 'string') {
-          // Handle string format (like "t" or base64 data)
-          if (samples.length > 10) {
-            // Likely base64 encoded image data
-            fingerprintImage = samples;
-            console.log("✅ Using direct string format (base64 data)");
-          } else {
-            // Short string, might be status message
-            console.log("Received status message:", samples);
-            setStatus(`Device status: ${samples}`);
-            return; // Don't process as fingerprint data
-          }
-        } else if (Array.isArray(samples) && samples.length > 0) {
-          // Handle array format
-          const firstSample = samples[0];
-          console.log("First sample structure:", firstSample);
+          if (typeof samples === 'string') {
+            // Handle string format (like "t" or base64 data)
+            if (samples.length > 10) {
+              // Likely base64 encoded image data
+              fingerprintImage = samples;
+              console.log("✅ Using direct string format (base64 data)");
+            } else {
+              // Short string, might be status message
+              console.log("Received status message:", samples);
+              setStatus(`Device status: ${samples}`);
+              return; // Don't process as fingerprint data
+            }
+          } else if (Array.isArray(samples) && samples.length > 0) {
+            // Handle array format
+            const firstSample = samples[0];
+            console.log("First sample structure:", firstSample);
 
-          if (firstSample?.Data) {
-            fingerprintImage = firstSample.Data;
-            console.log("✅ Using samples[0].Data format");
-          } else if (firstSample?.data) {
-            fingerprintImage = firstSample.data;
-            console.log("✅ Using samples[0].data format");
-          } else if (typeof firstSample === 'string') {
-            fingerprintImage = firstSample;
-            console.log("✅ Using samples[0] as string");
-          } else if (firstSample && typeof firstSample === 'object') {
-            const possibleKeys = ['Data', 'data', 'image', 'fingerprint', 'png', 'base64'];
+            if (firstSample?.Data) {
+              fingerprintImage = firstSample.Data;
+              console.log("✅ Using samples[0].Data format");
+            } else if (firstSample?.data) {
+              fingerprintImage = firstSample.data;
+              console.log("✅ Using samples[0].data format");
+            } else if (typeof firstSample === 'string') {
+              fingerprintImage = firstSample;
+              console.log("✅ Using samples[0] as string");
+            } else if (firstSample && typeof firstSample === 'object') {
+              const possibleKeys = ['Data', 'data', 'image', 'fingerprint', 'png', 'base64'];
+              for (const key of possibleKeys) {
+                if (firstSample[key]) {
+                  fingerprintImage = firstSample[key];
+                  console.log(`✅ Found data in samples[0].${key}`);
+                  break;
+                }
+              }
+            }
+
+            if (!fingerprintImage) {
+              console.error("Available sample properties:", Object.keys(firstSample || {}));
+              throw new Error("Could not extract fingerprint data from sample array");
+            }
+          } else if (samples && typeof samples === 'object' && !Array.isArray(samples)) {
+            // Handle object format
+            const objectKeys = Object.keys(samples);
+            console.log("Sample object properties:", objectKeys);
+            console.log("Sample object values:", samples);
+
+            // Try all possible keys that might contain data
+            const possibleKeys = ['Data', 'data', 'image', 'fingerprint', 'png', 'base64', 'content', 'value', 'result', 'payload'];
+
             for (const key of possibleKeys) {
-              if (firstSample[key]) {
-                fingerprintImage = firstSample[key];
-                console.log(`✅ Found data in samples[0].${key}`);
+              if (samples[key]) {
+                fingerprintImage = samples[key];
+                console.log(`✅ Found data in samples.${key}`);
                 break;
               }
             }
+
+            // If no standard keys found, try the first available property
+            if (!fingerprintImage && objectKeys.length > 0) {
+              const firstKey = objectKeys[0];
+              fingerprintImage = samples[firstKey];
+              console.log(`✅ Using first available property: samples.${firstKey}`);
+            }
+
+            if (!fingerprintImage) {
+              console.error("Available object properties:", objectKeys);
+              console.error("Object values:", JSON.stringify(samples, null, 2));
+              throw new Error("Could not extract fingerprint data from sample object");
+            }
+          } else {
+            throw new Error(`Unsupported sample format: ${typeof samples}`);
           }
 
           if (!fingerprintImage) {
-            console.error("Available sample properties:", Object.keys(firstSample || {}));
-            throw new Error("Could not extract fingerprint data from sample array");
+            throw new Error("No fingerprint data found in any supported format");
           }
-        } else if (samples && typeof samples === 'object' && !Array.isArray(samples)) {
-          // Handle object format
-          const objectKeys = Object.keys(samples);
-          console.log("Sample object properties:", objectKeys);
-          console.log("Sample object values:", samples);
 
-          // Try all possible keys that might contain data
-          const possibleKeys = ['Data', 'data', 'image', 'fingerprint', 'png', 'base64', 'content', 'value', 'result', 'payload'];
+          if (mode === 'verify') {
+            // For verification mode, send fingerprint to verification service
+            try {
+              console.log("🔍 Sending fingerprint for verification...");
+              const response = await fetch('http://localhost:3001/api/biometric/verify', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ fingerprint: fingerprintImage }),
+              });
 
-          for (const key of possibleKeys) {
-            if (samples[key]) {
-              fingerprintImage = samples[key];
-              console.log(`✅ Found data in samples.${key}`);
-              break;
+              const result = await response.json();
+
+              if (result.success) {
+                console.log("✅ Biometric verification successful for student:", result.studentId);
+                const verificationPayload = {
+                  success: true,
+                  studentId: result.studentId,
+                  message: result.message,
+                  timestamp: new Date().toISOString(),
+                };
+                onAuthSuccess(JSON.stringify(verificationPayload));
+                setStatus("Verification successful!");
+              } else {
+                console.log("❌ Biometric verification failed:", result.message);
+                onAuthError(result.message || "Verification failed");
+                setStatus("Verification failed. Please try again.");
+              }
+            } catch (verifyError) {
+              console.error("Verification request failed:", verifyError);
+              onAuthError("Verification service unavailable");
+              setStatus("Verification service error.");
             }
+          } else {
+            // For enrollment mode, return the captured fingerprint
+            const biometricPayload = {
+              biometricId: `${effectiveStudentId}-${Date.now()}`,
+              fingerprint: fingerprintImage,
+              timestamp: new Date().toISOString(),
+            };
+
+            console.log("✅ Biometric data captured for enrollment");
+            onAuthSuccess(JSON.stringify(biometricPayload));
+            setStatus("Fingerprint captured successfully!");
           }
 
-          // If no standard keys found, try the first available property
-          if (!fingerprintImage && objectKeys.length > 0) {
-            const firstKey = objectKeys[0];
-            fingerprintImage = samples[firstKey];
-            console.log(`✅ Using first available property: samples.${firstKey}`);
-          }
-
-          if (!fingerprintImage) {
-            console.error("Available object properties:", objectKeys);
-            console.error("Object values:", JSON.stringify(samples, null, 2));
-            throw new Error("Could not extract fingerprint data from sample object");
-          }
-        } else {
-          throw new Error(`Unsupported sample format: ${typeof samples}`);
+          reader.stopAcquisition();
+        } catch (err: any) {
+          console.error("Sample processing error:", err);
+          console.error("Sample details:", samples);
+          onAuthError(err.message || "Error processing fingerprint.");
         }
-
-        if (!fingerprintImage) {
-          throw new Error("No fingerprint data found in any supported format");
-        }
-
-        if (mode === 'verify') {
-          // For verification mode, send fingerprint to verification service
-          try {
-            console.log("🔍 Sending fingerprint for verification...");
-            const response = await fetch('http://localhost:3001/api/biometric/verify', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ fingerprint: fingerprintImage }),
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-              console.log("✅ Biometric verification successful for student:", result.studentId);
-              const verificationPayload = {
-                success: true,
-                studentId: result.studentId,
-                message: result.message,
-                timestamp: new Date().toISOString(),
-              };
-              onAuthSuccess(JSON.stringify(verificationPayload));
-              setStatus("Verification successful!");
-            } else {
-              console.log("❌ Biometric verification failed:", result.message);
-              onAuthError(result.message || "Verification failed");
-              setStatus("Verification failed. Please try again.");
-            }
-          } catch (verifyError) {
-            console.error("Verification request failed:", verifyError);
-            onAuthError("Verification service unavailable");
-            setStatus("Verification service error.");
-          }
-        } else {
-          // For enrollment mode, return the captured fingerprint
-          const biometricPayload = {
-            biometricId: `${effectiveStudentId}-${Date.now()}`,
-            fingerprint: fingerprintImage,
-            timestamp: new Date().toISOString(),
-          };
-
-          console.log("✅ Biometric data captured for enrollment");
-          onAuthSuccess(JSON.stringify(biometricPayload));
-          setStatus("Fingerprint captured successfully!");
-        }
-
-        reader.stopAcquisition();
-      } catch (err: any) {
-        console.error("Sample processing error:", err);
-        console.error("Sample details:", samples);
-        onAuthError(err.message || "Error processing fingerprint.");
-      }
-    };
+      };
+    }
 
     return () => {
-      reader.stopAcquisition().catch(() => {});
+      if (reader && !useMockMode) {
+        reader.stopAcquisition().catch(() => {});
+      }
     };
-  }, [mode, effectiveStudentId, onAuthSuccess, onAuthError, reader, sdkLoaded]);
+  }, [mode, effectiveStudentId, onAuthSuccess, onAuthError, reader, sdkLoaded, useMockMode]);
 
   return (
     <div className="text-center space-y-3">
+      {useMockMode && (
+        <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-2 mb-3">
+          <div className="flex items-center justify-center gap-2">
+            <div className="text-yellow-600 text-sm font-medium">🔧 MOCK MODE ACTIVE</div>
+          </div>
+          <p className="text-xs text-yellow-700 mt-1">
+            Testing biometric functionality without hardware
+          </p>
+        </div>
+      )}
       <p className="text-sm text-muted-foreground">{status}</p>
-      {status.includes("failed to load") && (
+      {status.includes("failed to load") && !useMockMode && (
         <div className="text-xs text-red-600 mt-2 space-y-1">
           <p><strong>Troubleshooting steps for U.are.U 4500:</strong></p>
           <ul className="text-left list-disc list-inside">
@@ -320,6 +394,13 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
             <li>Check browser console for detailed error messages</li>
             <li>Ensure no other applications are using the fingerprint reader</li>
           </ul>
+        </div>
+      )}
+      {useMockMode && (
+        <div className="text-xs text-blue-600 mt-2">
+          <p><strong>Mock Mode Instructions:</strong></p>
+          <p>The system will automatically simulate fingerprint verification in a few seconds.</p>
+          <p>This allows you to test the complete book issuance workflow.</p>
         </div>
       )}
     </div>

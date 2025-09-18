@@ -152,7 +152,36 @@ export const createBorrowRecord = async (recordData: {
   }
 
   try {
-    return await apiClient.createBorrowRecord(recordData);
+    // First, find an available copy of the book
+    const availableBooks = await apiClient.getBooks();
+    const selectedBook = availableBooks.find((book: any) =>
+      book.id === recordData.book_id && book.available_copies > 0
+    );
+
+    if (!selectedBook) {
+      throw new Error('No available copies of this book');
+    }
+
+    if (!selectedBook.copies || selectedBook.copies.length === 0) {
+      throw new Error('No book copies found for this book');
+    }
+
+    // Find the first available copy
+    const availableCopy = selectedBook.copies.find((copy: any) => copy.status === 'available');
+
+    if (!availableCopy) {
+      throw new Error('No available copies of this book');
+    }
+
+    // Create the borrow record with the actual book copy ID
+    const borrowData = {
+      book_copy_id: availableCopy.id, // Use the actual copy ID
+      student_id: recordData.student_id,
+      due_period_value: recordData.due_period_value,
+      due_period_unit: recordData.due_period_unit
+    };
+
+    return await apiClient.createBorrowRecord(borrowData);
   } catch (error) {
     console.error('Error creating borrow record:', error);
     throw error;
@@ -179,9 +208,17 @@ export const unblacklistStudent = async (studentId: string, reason: string) => {
   }
 
   try {
-    // For now, we'll implement this as a simple API call
-    // In a full implementation, you'd have a dedicated endpoint for this
-    console.log(`Unblacklisting student ${studentId} with reason: ${reason}`);
+    // Update student record to remove blacklist
+    const updateData = {
+      blacklisted: false,
+      blacklist_until: null,
+      blacklist_reason: null,
+      unblacklist_reason: reason,
+      unblacklist_date: new Date().toISOString()
+    };
+
+    await apiClient.updateStudent(studentId, updateData);
+    console.log(`✅ Student ${studentId} unblacklisted with reason: ${reason}`);
     return { success: true };
   } catch (error) {
     console.error('Error unblacklisting student:', error);
@@ -195,10 +232,90 @@ export const processOverdueBooks = async () => {
   }
 
   try {
-    // For now, we'll implement this as a simple API call
-    // In a full implementation, you'd have a dedicated endpoint for this
-    console.log('Processing overdue books...');
-    return { success: true };
+    console.log('🔍 Processing overdue books and updating blacklist...');
+
+    // Get all borrow records and students
+    const [borrowRecords, students] = await Promise.all([
+      apiClient.getBorrowRecords(),
+      apiClient.getStudents()
+    ]);
+
+    const now = new Date();
+    const overdueRecords = borrowRecords.filter(record =>
+      record.status === 'borrowed' && new Date(record.due_date) < now
+    );
+
+    // Group overdue records by student
+    const studentOverdueCount = new Map<string, any[]>();
+    overdueRecords.forEach(record => {
+      if (!studentOverdueCount.has(record.student_id)) {
+        studentOverdueCount.set(record.student_id, []);
+      }
+      studentOverdueCount.get(record.student_id)!.push(record);
+    });
+
+    let blacklistedCount = 0;
+    let updatedCount = 0;
+
+    // Process each student with overdue books
+    for (const [studentId, records] of studentOverdueCount) {
+      const student = students.find(s => s.id === studentId);
+      if (!student) continue;
+
+      // Calculate days overdue for the most overdue book
+      const mostOverdueRecord = records.reduce((prev, current) => {
+        const prevDays = Math.floor((now.getTime() - new Date(prev.due_date).getTime()) / (1000 * 60 * 60 * 24));
+        const currentDays = Math.floor((now.getTime() - new Date(current.due_date).getTime()) / (1000 * 60 * 60 * 24));
+        return currentDays > prevDays ? current : prev;
+      });
+
+      const daysOverdue = Math.floor((now.getTime() - new Date(mostOverdueRecord.due_date).getTime()) / (1000 * 60 * 60 * 24));
+
+      // Blacklist criteria: 3+ overdue books OR any book overdue by 7+ days
+      const shouldBlacklist = records.length >= 3 || daysOverdue >= 7;
+
+      if (shouldBlacklist && !student.blacklisted) {
+        // Calculate blacklist duration based on severity
+        let blacklistDays = 7; // Default 1 week
+        if (records.length >= 5 || daysOverdue >= 14) {
+          blacklistDays = 30; // 1 month for severe cases
+        } else if (records.length >= 3 || daysOverdue >= 7) {
+          blacklistDays = 14; // 2 weeks for moderate cases
+        }
+
+        const blacklistUntil = new Date();
+        blacklistUntil.setDate(blacklistUntil.getDate() + blacklistDays);
+
+        const blacklistReason = `Overdue books: ${records.length} book(s), most overdue by ${daysOverdue} day(s)`;
+
+        const updateData = {
+          blacklisted: true,
+          blacklist_until: blacklistUntil.toISOString(),
+          blacklist_reason: blacklistReason,
+          blacklist_date: now.toISOString()
+        };
+
+        await apiClient.updateStudent(studentId, updateData);
+        blacklistedCount++;
+        console.log(`🚫 Blacklisted student ${student.name} (${studentId}) for ${blacklistDays} days: ${blacklistReason}`);
+      } else if (student.blacklisted && !shouldBlacklist) {
+        // Student is blacklisted but no longer meets criteria - could unblacklist automatically
+        // For now, we'll leave this manual to avoid accidental unblacklisting
+        console.log(`⚠️ Student ${student.name} (${studentId}) has ${records.length} overdue book(s), ${daysOverdue} days overdue - manual review recommended`);
+      } else if (student.blacklisted) {
+        updatedCount++;
+        console.log(`📝 Updated blacklist status for ${student.name} (${studentId})`);
+      }
+    }
+
+    console.log(`✅ Blacklist processing complete: ${blacklistedCount} students blacklisted, ${updatedCount} updated`);
+    return {
+      success: true,
+      blacklistedCount,
+      updatedCount,
+      totalOverdueRecords: overdueRecords.length,
+      affectedStudents: studentOverdueCount.size
+    };
   } catch (error) {
     console.error('Error processing overdue books:', error);
     throw error;
@@ -210,7 +327,7 @@ export const logBiometricVerification = async (verificationData: {
   student_id: string;
   book_id?: string;
   verification_type: 'book_issue' | 'book_return' | 'enrollment' | 'verification';
-  verification_method: 'fingerprint' | 'face' | 'card';
+  verification_method: 'fingerprint' | 'face' | 'card' | 'manual_selection';
   verification_status: 'success' | 'failed';
   verified_by?: string;
   verification_timestamp: string;

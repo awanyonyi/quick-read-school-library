@@ -11,13 +11,15 @@ interface BiometricVerificationProps {
   onClose: () => void;
   onVerificationSuccess: (student: Student) => void;
   onVerificationError: (error: string) => void;
+  onManualSelection?: () => void; // Optional callback for manual selection
 }
 
 export const BiometricVerification: React.FC<BiometricVerificationProps> = ({
   isOpen,
   onClose,
   onVerificationSuccess,
-  onVerificationError
+  onVerificationError,
+  onManualSelection
 }) => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationStep, setVerificationStep] = useState<'start' | 'verifying' | 'success'>('start');
@@ -92,6 +94,32 @@ export const BiometricVerification: React.FC<BiometricVerificationProps> = ({
   };
 
   const handleVerificationError = (error: string) => {
+    console.error("Biometric verification error:", error);
+
+    // Check if it's a setup/configuration error
+    const isSetupError = error.includes("SDK") || error.includes("device") || error.includes("drivers");
+
+    if (isSetupError) {
+      // For setup errors, show a more helpful message and don't immediately close
+      toast({
+        title: "Biometric Setup Required",
+        description: (
+          <div className="space-y-2">
+            <p>{error}</p>
+            <p className="text-sm">You can still proceed with manual student selection.</p>
+          </div>
+        ),
+        variant: "default",
+        duration: 5000
+      });
+
+      // Reset to start state but don't call onVerificationError yet
+      setVerificationStep('start');
+      setIsVerifying(false);
+      return;
+    }
+
+    // For other errors, proceed with normal error handling
     onVerificationError(error);
     toast({
       title: "Verification Failed",
@@ -147,13 +175,31 @@ export const BiometricVerification: React.FC<BiometricVerificationProps> = ({
                 </p>
               </div>
 
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={onClose} className="flex-1">
-                  Cancel
-                </Button>
-                <Button onClick={startVerification} className="flex-1">
-                  Start Verification
-                </Button>
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={onClose} className="flex-1">
+                    Cancel
+                  </Button>
+                  <Button onClick={startVerification} className="flex-1">
+                    <Shield className="h-4 w-4 mr-2" />
+                    Biometric Verification
+                  </Button>
+                </div>
+
+                {onManualSelection && (
+                  <div className="text-center">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        onClose();
+                        onManualSelection();
+                      }}
+                      className="text-sm text-muted-foreground hover:text-foreground"
+                    >
+                      Or select student manually →
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Student } from '../types';
-import { Plus, Edit, Trash2, User, Upload, Fingerprint, Shield } from 'lucide-react';
+import { Plus, Edit, Trash2, User, Upload, Fingerprint, Shield, Search, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { StudentExcelUpload } from './StudentExcelUpload';
 import { BiometricEnrollment } from './BiometricEnrollment';
@@ -23,6 +23,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [showExcelUpload, setShowExcelUpload] = useState(false);
   const [biometricEnrollmentStudent, setBiometricEnrollmentStudent] = useState<Student | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     admission_number: '',
@@ -156,6 +157,19 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
     }
   };
 
+  // Filter students based on search query
+  const filteredStudents = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return students;
+    }
+    return students.filter(student =>
+      student.admission_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.class?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [students, searchQuery]);
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -286,12 +300,40 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
 
       <Card>
         <CardHeader>
-          <CardTitle>Registered Students ({students.length})</CardTitle>
+          <CardTitle>Registered Students ({filteredStudents.length})</CardTitle>
           <CardDescription>All students registered in the library system</CardDescription>
+
+          {/* Search Input */}
+          <div className="flex items-center space-x-2 pt-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                placeholder="Search by admission number, name, email, or class..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-10"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-gray-100"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+            {searchQuery && (
+              <div className="text-sm text-gray-500">
+                {filteredStudents.length} of {students.length} students
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-3 sm:space-y-4">
-            {students.map((student) => (
+            {filteredStudents.map((student) => (
               <div key={student.id} className="border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
                   <div className="flex-1 min-w-0">
@@ -362,10 +404,12 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ onUpdate }
                 </div>
               </div>
             ))}
-            {students.length === 0 && (
+            {filteredStudents.length === 0 && (
               <div className="text-center py-8 sm:py-12">
                 <User className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 mb-4 text-sm sm:text-base">No students registered yet</p>
+                <p className="text-gray-500 mb-4 text-sm sm:text-base">
+                  {searchQuery ? 'No students found matching your search' : 'No students registered yet'}
+                </p>
                 <div className="flex flex-col sm:flex-row justify-center gap-2 sm:space-x-2">
                   <Button onClick={() => setShowExcelUpload(true)} variant="outline" className="w-full sm:w-auto">
                     <Upload className="h-4 w-4 mr-2" />

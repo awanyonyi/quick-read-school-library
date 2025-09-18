@@ -20,15 +20,23 @@ const LoginForm = ({ onBackToHome }: LoginFormProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     if (!username || !password) {
       setError('Please enter both username and password');
       return;
     }
 
-    const success = await login(username, password);
-    if (!success) {
-      setError('Invalid credentials. Please try again.');
+    // Basic client-side validation for admin login
+    if (username === 'admin' || /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      if (password.length < 8) {
+        setError('Admin password must be at least 8 characters long');
+        return;
+      }
+    }
+
+    const result = await login(username, password);
+    if (!result.success) {
+      setError(result.error || 'Invalid credentials. Please try again.');
     }
   };
 

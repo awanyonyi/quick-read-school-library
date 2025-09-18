@@ -12,7 +12,7 @@ import { Plus, Edit, Trash2, Book, Clock, FileSpreadsheet } from 'lucide-react';
 import BookExcelManager from './BookExcelManager';
 import { Book as BookType } from '@/types';
 import { fetchBooks, addBook } from '@/utils/libraryData';
-import { useToast } from '@/hooks/use-toast';
+import { toast, useToast } from '@/hooks/use-toast';
 
 interface EnhancedBookManagementProps {
   onUpdate: () => void;
@@ -64,7 +64,7 @@ export default function EnhancedBookManagement({ onUpdate }: EnhancedBookManagem
     due_period_unit: 'hours'
   });
   
-  const { toast } = useToast();
+  const { dismiss } = useToast();
 
   useEffect(() => {
     loadBooks();

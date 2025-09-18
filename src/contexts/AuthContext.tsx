@@ -34,33 +34,82 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Check if user is already logged in from localStorage
     const storedUser = localStorage.getItem('library_user');
+    const storedToken = localStorage.getItem('admin_token');
+    const tokenExpires = localStorage.getItem('token_expires');
+
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const userProfile = JSON.parse(storedUser);
+
+        // For admin users, since login is hard-coded, just check token expiry
+        if (userProfile.role === 'admin' && storedToken && tokenExpires) {
+          const expiresAt = new Date(tokenExpires);
+          if (new Date() < expiresAt) {
+            // Token still valid, keep user logged in
+            setUser(userProfile);
+            setIsLoading(false);
+          } else {
+            // Token expired, clear storage
+            localStorage.removeItem('library_user');
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('token_expires');
+            setIsLoading(false);
+          }
+        } else {
+          // Student user or no token, just set the user
+          setUser(userProfile);
+          setIsLoading(false);
+        }
       } catch (error) {
         console.error('Error parsing stored user:', error);
         localStorage.removeItem('library_user');
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('token_expires');
+        setIsLoading(false);
       }
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
   const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
 
-      // For now, use simple authentication
-      // Admin login: username "admin", password "admin123"
-      if (username === 'admin' && password === 'admin123') {
-        const userProfile: UserProfile = {
-          id: 'admin-1',
-          name: 'Administrator',
-          role: 'admin',
-          email: 'admin@school.edu'
-        };
-        setUser(userProfile);
-        localStorage.setItem('library_user', JSON.stringify(userProfile));
-        return { success: true };
+      // Check if this is admin login
+      const isAdminAttempt = username === 'admin';
+
+      if (isAdminAttempt) {
+        // Hard-coded admin login
+        if (username === 'admin' && password === 'Sheila1234') {
+          const mockAdminData = {
+            success: true,
+            user: {
+              id: 'admin-1',
+              username: 'admin',
+              email: 'admin@school.com'
+            },
+            token: 'mock-admin-token',
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
+          };
+
+          const userProfile: UserProfile = {
+            id: mockAdminData.user.id,
+            name: mockAdminData.user.username,
+            role: 'admin',
+            email: mockAdminData.user.email
+          };
+
+          // Store both user profile and token
+          setUser(userProfile);
+          localStorage.setItem('library_user', JSON.stringify(userProfile));
+          localStorage.setItem('admin_token', mockAdminData.token);
+          localStorage.setItem('token_expires', mockAdminData.expiresAt);
+
+          return { success: true };
+        } else {
+          return { success: false, error: 'Invalid admin credentials' };
+        }
       }
 
       // Student login: try to find student by admission number
@@ -98,12 +147,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async (): Promise<void> => {
-    setUser(null);
-    localStorage.removeItem('library_user');
-    toast({
-      title: "Logged out",
-      description: "You have been logged out successfully",
-    });
+    try {
+      // Clear all stored data
+      setUser(null);
+      localStorage.removeItem('library_user');
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('token_expires');
+
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully",
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still clear local data even if there are errors
+      setUser(null);
+      localStorage.removeItem('library_user');
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('token_expires');
+    }
   };
 
   return (

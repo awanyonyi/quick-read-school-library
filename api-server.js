@@ -990,6 +990,35 @@ app.put('/api/borrowing/:recordId/return', async (req, res) => {
   }
 });
 
+// Admin authentication routes
+import {
+  adminLogin,
+  adminLogout,
+  verifyAdminSession,
+  changeAdminPassword,
+  changeAdminUsername,
+  getAdminProfile,
+  requireAdminAuth
+} from './src/api/admin.ts';
+
+// Admin login
+app.post('/api/admin/login', adminLogin);
+
+// Admin logout
+app.post('/api/admin/logout', adminLogout);
+
+// Verify admin session
+app.get('/api/admin/verify', verifyAdminSession);
+
+// Get admin profile (protected route)
+app.get('/api/admin/profile', requireAdminAuth, getAdminProfile);
+
+// Change admin password (protected route)
+app.put('/api/admin/password', requireAdminAuth, changeAdminPassword);
+
+// Change admin username (protected route)
+app.put('/api/admin/username', requireAdminAuth, changeAdminUsername);
+
 // Helper function to calculate due date
 const calculateDueDate = (borrowDate, duePeriodValue = 24, duePeriodUnit = 'hours') => {
   const borrow = new Date(borrowDate);

@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS books (
 );
 
 -- Book copies table (each physical copy)
-CREATE TABLE book_copies (
+CREATE TABLE IF NOT EXISTS book_copies (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   book_id VARCHAR(36) NOT NULL,
   isbn VARCHAR(20) UNIQUE NOT NULL,
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS borrow_records (
 );
 
 -- Biometric verification logs table
-CREATE TABLE biometric_verification_logs (
+CREATE TABLE IF NOT EXISTS biometric_verification_logs (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   student_id VARCHAR(36) NOT NULL,
   book_copy_id VARCHAR(36) NULL,
@@ -100,7 +100,7 @@ CREATE TABLE biometric_verification_logs (
 );
 
 -- User roles and permissions (for future admin features)
-CREATE TABLE user_roles (
+CREATE TABLE IF NOT EXISTS user_roles (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   name VARCHAR(100) UNIQUE NOT NULL,
   description TEXT,
@@ -110,7 +110,7 @@ CREATE TABLE user_roles (
 );
 
 -- System settings table
-CREATE TABLE system_settings (
+CREATE TABLE IF NOT EXISTS system_settings (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   setting_key VARCHAR(255) UNIQUE NOT NULL,
   setting_value JSON,

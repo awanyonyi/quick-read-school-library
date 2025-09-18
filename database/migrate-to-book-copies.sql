@@ -21,7 +21,7 @@ DELIMITER //
 
 CREATE PROCEDURE migrate_books_to_copies()
 BEGIN
-  DECLARE done INT DEFAULT FALSE;
+  DECLARE done BOOLEAN DEFAULT FALSE;
   DECLARE book_id_val VARCHAR(36);
   DECLARE total_copies_val INT;
   DECLARE available_copies_val INT;
@@ -91,7 +91,7 @@ DELIMITER //
 
 CREATE PROCEDURE update_borrow_records()
 BEGIN
-  DECLARE done INT DEFAULT FALSE;
+  DECLARE done BOOLEAN DEFAULT FALSE;
   DECLARE borrow_id_val VARCHAR(36);
   DECLARE book_id_val VARCHAR(36);
   DECLARE copy_id_val VARCHAR(36);
@@ -137,7 +137,7 @@ DELIMITER ;
 CALL update_borrow_records();
 
 -- Drop the procedure
-DROP update_borrow_records;
+DROP PROCEDURE update_borrow_records;
 
 -- Step 4: Update biometric_verification_logs to reference book_copy_id
 UPDATE biometric_verification_logs bvl

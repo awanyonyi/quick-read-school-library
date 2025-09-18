@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, UserX, UserCheck, Clock } from 'lucide-react';
 import { Student } from '@/types';
 import { fetchStudents, unblacklistStudent, processOverdueBooks } from '@/utils/libraryData';
-import { useToast } from '@/hooks/use-toast';
+import { toast, useToast } from '@/hooks/use-toast';
 
 interface BlacklistManagementProps {
   onUpdate: () => void;
@@ -22,7 +22,7 @@ export default function BlacklistManagement({ onUpdate }: BlacklistManagementPro
   const [isUnblacklistDialogOpen, setIsUnblacklistDialogOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  const { toast } = useToast();
+  const { dismiss } = useToast();
 
   useEffect(() => {
     loadStudents();

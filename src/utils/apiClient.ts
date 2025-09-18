@@ -134,6 +134,38 @@ class ApiClient {
 
     return this.request(endpoint);
   }
+
+  // Admin authentication methods
+  async adminLogin(credentials: { username: string; password: string }): Promise<any> {
+    return this.request('/admin/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+  }
+
+  async adminLogout(): Promise<any> {
+    return this.request('/admin/logout', {
+      method: 'POST',
+    });
+  }
+
+  async verifyAdminSession(): Promise<any> {
+    return this.request('/admin/verify');
+  }
+
+  async getAdminProfile(): Promise<any> {
+    return this.request('/admin/profile');
+  }
+
+  async changeAdminPassword(passwordData: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<any> {
+    return this.request('/admin/password', {
+      method: 'PUT',
+      body: JSON.stringify(passwordData),
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Download, Upload, FileSpreadsheet, CheckCircle, XCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast, useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { fetchBooks, addBook } from '@/utils/libraryData';
 import { Book } from '@/types';
@@ -21,7 +21,7 @@ interface UploadResult {
 export default function BookExcelManager({ onUploadComplete }: BookExcelManagerProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResults, setUploadResults] = useState<UploadResult | null>(null);
-  const { toast } = useToast();
+  const { dismiss } = useToast();
 
   // ES6: Arrow function with template literals and destructuring
   const downloadTemplate = () => {
