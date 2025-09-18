@@ -2,6 +2,7 @@ import express from 'express';
 import mysql from 'mysql2/promise';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import bcrypt from 'bcrypt';
 import { mockDataProvider } from './src/utils/mockData.ts';
 
 dotenv.config();
@@ -1646,19 +1647,13 @@ app.put('/api/borrowing/:recordId/return', async (req, res) => {
   }
 });
 
-// Admin authentication routes - inline implementation
-const ADMIN_CREDENTIALS = {
-  username: 'Maryland_library',
-  password: 'Sheila_library',
-  id: 'admin-1',
-  email: 'admin@maryland.edu',
-  role: 'admin'
-};
+// Admin authentication routes - database implementation
 
 // Admin login
 app.post('/api/admin/login', async (req, res) => {
   try {
     const { username, password } = req.body;
+    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
 
     // Validate input
     if (!username || !password) {
@@ -1667,37 +1662,60 @@ app.post('/api/admin/login', async (req, res) => {
       });
     }
 
-    // Check hardcoded credentials
-    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-      // Create JWT token
-      const jwt = await import('jsonwebtoken');
-      const token = jwt.default.sign(
-        {
-          adminId: ADMIN_CREDENTIALS.id,
-          username: ADMIN_CREDENTIALS.username,
-          role: ADMIN_CREDENTIALS.role,
-          sessionToken: 'admin-session-' + Date.now()
-        },
-        process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production',
-        { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
-      );
+    // Get admin user from database
+    const admin = await getAdminByUsername(username);
 
-      return res.json({
-        success: true,
-        token: token,
-        user: {
-          id: ADMIN_CREDENTIALS.id,
-          username: ADMIN_CREDENTIALS.username,
-          email: ADMIN_CREDENTIALS.email,
-          role: ADMIN_CREDENTIALS.role,
-          lastLogin: new Date().toISOString()
-        },
-        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
+    if (!admin) {
+      await updateAdminLoginAttempts(username, false, clientIP);
+      return res.status(401).json({
+        error: 'Invalid credentials'
       });
     }
 
-    return res.status(401).json({
-      error: 'Invalid credentials'
+    // Check if account is locked
+    if (admin.locked_until && new Date(admin.locked_until) > new Date()) {
+      return res.status(423).json({
+        error: 'Account is temporarily locked due to too many failed login attempts'
+      });
+    }
+
+    // Verify password
+    const isValidPassword = await verifyPassword(password, admin.password_hash);
+
+    if (!isValidPassword) {
+      await updateAdminLoginAttempts(username, false, clientIP);
+      return res.status(401).json({
+        error: 'Invalid credentials'
+      });
+    }
+
+    // Update login attempts (success)
+    await updateAdminLoginAttempts(username, true, clientIP);
+
+    // Create JWT token
+    const jwt = await import('jsonwebtoken');
+    const token = jwt.default.sign(
+      {
+        adminId: admin.id,
+        username: admin.username,
+        role: admin.role,
+        sessionToken: 'admin-session-' + Date.now()
+      },
+      process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production',
+      { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+    );
+
+    return res.json({
+      success: true,
+      token: token,
+      user: {
+        id: admin.id,
+        username: admin.username,
+        email: admin.email,
+        role: admin.role,
+        lastLogin: admin.last_login || new Date().toISOString()
+      },
+      expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
     });
 
   } catch (error) {
@@ -1723,14 +1741,21 @@ app.get('/api/admin/verify', async (req, res) => {
     const jwt = await import('jsonwebtoken');
     const decoded = jwt.default.verify(token, process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production');
 
+    // Get fresh admin data from database
+    const admin = await getAdminById(decoded.adminId);
+
+    if (!admin) {
+      return res.status(401).json({ error: 'Admin account not found' });
+    }
+
     res.json({
       success: true,
       user: {
-        id: ADMIN_CREDENTIALS.id,
-        username: ADMIN_CREDENTIALS.username,
-        email: ADMIN_CREDENTIALS.email,
-        role: ADMIN_CREDENTIALS.role,
-        lastLogin: new Date().toISOString()
+        id: admin.id,
+        username: admin.username,
+        email: admin.email,
+        role: admin.role,
+        lastLogin: admin.last_login || new Date().toISOString()
       }
     });
 
@@ -1750,17 +1775,24 @@ app.get('/api/admin/profile', async (req, res) => {
     }
 
     const jwt = await import('jsonwebtoken');
-    jwt.default.verify(token, process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production');
+    const decoded = jwt.default.verify(token, process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production');
+
+    // Get fresh admin data from database
+    const admin = await getAdminById(decoded.adminId);
+
+    if (!admin) {
+      return res.status(401).json({ error: 'Admin account not found' });
+    }
 
     res.json({
       success: true,
       user: {
-        id: ADMIN_CREDENTIALS.id,
-        username: ADMIN_CREDENTIALS.username,
-        email: ADMIN_CREDENTIALS.email,
-        role: ADMIN_CREDENTIALS.role,
-        lastLogin: new Date().toISOString(),
-        createdAt: new Date().toISOString()
+        id: admin.id,
+        username: admin.username,
+        email: admin.email,
+        role: admin.role,
+        lastLogin: admin.last_login || new Date().toISOString(),
+        passwordChangedAt: admin.password_changed_at
       }
     });
 
@@ -1780,7 +1812,7 @@ app.put('/api/admin/password', async (req, res) => {
     }
 
     const jwt = await import('jsonwebtoken');
-    jwt.default.verify(token, process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production');
+    const decoded = jwt.default.verify(token, process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production');
 
     const { currentPassword, newPassword } = req.body;
 
@@ -1791,22 +1823,35 @@ app.put('/api/admin/password', async (req, res) => {
       });
     }
 
-    // Check if current password matches
-    if (currentPassword !== ADMIN_CREDENTIALS.password) {
+    // Get admin from database
+    const admin = await getAdminById(decoded.adminId);
+
+    if (!admin) {
+      return res.status(401).json({ error: 'Admin account not found' });
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await verifyPassword(currentPassword, admin.password_hash);
+
+    if (!isCurrentPasswordValid) {
       return res.status(401).json({
         error: 'Current password is incorrect'
       });
     }
 
-    // Validate new password
-    if (newPassword.length < 6) {
+    // Validate new password (get requirements from settings)
+    if (newPassword.length < 8) {
       return res.status(400).json({
-        error: 'New password must be at least 6 characters long'
+        error: 'New password must be at least 8 characters long'
       });
     }
 
-    // Update the hardcoded password
-    ADMIN_CREDENTIALS.password = newPassword;
+    // Update password in database
+    const success = await updateAdminPassword(decoded.adminId, newPassword);
+
+    if (!success) {
+      return res.status(500).json({ error: 'Failed to update password' });
+    }
 
     res.json({
       success: true,
@@ -1828,7 +1873,7 @@ app.put('/api/admin/username', async (req, res) => {
     }
 
     const jwt = await import('jsonwebtoken');
-    jwt.default.verify(token, process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production');
+    const decoded = jwt.default.verify(token, process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production');
 
     const { currentPassword, newUsername } = req.body;
 
@@ -1839,8 +1884,17 @@ app.put('/api/admin/username', async (req, res) => {
       });
     }
 
-    // Check if current password matches
-    if (currentPassword !== ADMIN_CREDENTIALS.password) {
+    // Get admin from database
+    const admin = await getAdminById(decoded.adminId);
+
+    if (!admin) {
+      return res.status(401).json({ error: 'Admin account not found' });
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await verifyPassword(currentPassword, admin.password_hash);
+
+    if (!isCurrentPasswordValid) {
       return res.status(401).json({
         error: 'Current password is incorrect'
       });
@@ -1853,8 +1907,20 @@ app.put('/api/admin/username', async (req, res) => {
       });
     }
 
-    // Update the hardcoded username
-    ADMIN_CREDENTIALS.username = newUsername;
+    // Check if username is already taken
+    const existingAdmin = await getAdminByUsername(newUsername);
+    if (existingAdmin && existingAdmin.id !== decoded.adminId) {
+      return res.status(400).json({
+        error: 'Username is already taken'
+      });
+    }
+
+    // Update username in database
+    const success = await updateAdminUsername(decoded.adminId, newUsername);
+
+    if (!success) {
+      return res.status(500).json({ error: 'Failed to update username' });
+    }
 
     res.json({
       success: true,
@@ -1886,6 +1952,124 @@ const calculateDueDate = (borrowDate, duePeriodValue = 24, duePeriodUnit = 'hour
   }
 
   return borrow;
+};
+
+// Admin authentication helper functions
+const hashPassword = async (password) => {
+  const saltRounds = 12;
+  return await bcrypt.hash(password, saltRounds);
+};
+
+const verifyPassword = async (password, hash) => {
+  return await bcrypt.compare(password, hash);
+};
+
+const getAdminByUsername = async (username) => {
+  try {
+    const query = `
+      SELECT id, username, email, password_hash, salt, role, is_active,
+             last_login, login_attempts, locked_until, password_changed_at
+      FROM admin_users
+      WHERE username = ? AND is_active = TRUE
+    `;
+    const [rows] = await pool.execute(query, [username]);
+    return rows[0] || null;
+  } catch (error) {
+    console.error('Error fetching admin by username:', error);
+    return null;
+  }
+};
+
+const getAdminById = async (adminId) => {
+  try {
+    const query = `
+      SELECT id, username, email, role, is_active, last_login, password_changed_at
+      FROM admin_users
+      WHERE id = ? AND is_active = TRUE
+    `;
+    const [rows] = await pool.execute(query, [adminId]);
+    return rows[0] || null;
+  } catch (error) {
+    console.error('Error fetching admin by ID:', error);
+    return null;
+  }
+};
+
+const updateAdminLoginAttempts = async (username, success, ipAddress = null) => {
+  try {
+    if (success) {
+      // Reset login attempts and update last login
+      const query = `
+        UPDATE admin_users
+        SET login_attempts = 0, locked_until = NULL, last_login = NOW()
+        WHERE username = ?
+      `;
+      await pool.execute(query, [username]);
+    } else {
+      // Increment login attempts
+      const query = `
+        UPDATE admin_users
+        SET login_attempts = login_attempts + 1
+        WHERE username = ?
+      `;
+      await pool.execute(query, [username]);
+
+      // Check if account should be locked
+      const admin = await getAdminByUsername(username);
+      if (admin && admin.login_attempts >= 5) {
+        const lockoutMinutes = 30; // Could be configurable
+        const lockoutTime = new Date(Date.now() + lockoutMinutes * 60 * 1000);
+        const lockQuery = `
+          UPDATE admin_users
+          SET locked_until = ?
+          WHERE username = ?
+        `;
+        await pool.execute(lockQuery, [lockoutTime, username]);
+      }
+    }
+
+    // Log the attempt
+    if (ipAddress) {
+      const logQuery = `
+        INSERT INTO login_attempts (username, ip_address, success)
+        VALUES (?, ?, ?)
+      `;
+      await pool.execute(logQuery, [username, ipAddress, success]);
+    }
+  } catch (error) {
+    console.error('Error updating login attempts:', error);
+  }
+};
+
+const updateAdminPassword = async (adminId, newPassword) => {
+  try {
+    const hashedPassword = await hashPassword(newPassword);
+    const query = `
+      UPDATE admin_users
+      SET password_hash = ?, password_changed_at = NOW(), updated_at = NOW()
+      WHERE id = ?
+    `;
+    await pool.execute(query, [hashedPassword, adminId]);
+    return true;
+  } catch (error) {
+    console.error('Error updating admin password:', error);
+    return false;
+  }
+};
+
+const updateAdminUsername = async (adminId, newUsername) => {
+  try {
+    const query = `
+      UPDATE admin_users
+      SET username = ?, updated_at = NOW()
+      WHERE id = ?
+    `;
+    await pool.execute(query, [newUsername, adminId]);
+    return true;
+  } catch (error) {
+    console.error('Error updating admin username:', error);
+    return false;
+  }
 };
 
 // Start server

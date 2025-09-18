@@ -36,12 +36,28 @@ async function setupAdminSecurity() {
     connection = await mysql.createConnection(dbConfig);
     console.log('✅ Database connected successfully\n');
 
-    // Read and execute the security schema
+    // Read and execute the security schema line by line
     const schemaPath = path.join(__dirname, '../database/admin-security-schema.sql');
     const schemaSQL = fs.readFileSync(schemaPath, 'utf8');
 
     console.log('🛠️  Creating admin security tables...');
-    await connection.execute(schemaSQL);
+
+    // Split SQL into individual statements and filter out comments and empty lines
+    const statements = schemaSQL
+      .split(';')
+      .map(stmt => stmt.trim())
+      .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
+
+    for (const statement of statements) {
+      if (statement.trim()) {
+        try {
+          await connection.execute(statement);
+        } catch (stmtError) {
+          console.error('Error executing statement:', statement.substring(0, 100) + '...');
+          throw stmtError;
+        }
+      }
+    }
     console.log('✅ Admin security tables created successfully\n');
 
     // Verify the setup

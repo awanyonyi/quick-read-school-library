@@ -107,7 +107,8 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
 }
 
@@ -147,7 +148,13 @@ All colors MUST be HSL.
 @media (max-width: 640px) {
   /* Increase button sizes for better touch targets */
   .btn-mobile {
-    @apply min-h-[44px] px-4 py-2 text-base;
+    min-height: 44px;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    font-size: 1rem;
+    line-height: 1.5rem;
   }
 
   /* Better spacing for mobile cards */
@@ -197,4 +204,39 @@ All colors MUST be HSL.
   .safe-area-bottom {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
+}
+
+/* Hero Section Animations */
+@keyframes progress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.animate-progress {
+  animation: progress 5s linear infinite;
+}
+
+/* Enhanced fade-in animation */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease-out;
+}
+
+/* Smooth image transitions */
+.image-transition {
+  transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
 }
