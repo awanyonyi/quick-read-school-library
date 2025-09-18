@@ -275,6 +275,189 @@ app.post('/api/books', async (req, res) => {
   }
 });
 
+app.delete('/api/books/:bookId', async (req, res) => {
+  try {
+    const { bookId } = req.params;
+
+    if (useMockData) {
+      // Mock delete
+      res.json({ message: 'Book deleted successfully (mock)' });
+    } else {
+      // Start transaction
+      const connection = await pool.getConnection();
+      await connection.beginTransaction();
+
+      try {
+        // Check if any book copies are currently borrowed
+        const borrowCheckQuery = `
+          SELECT COUNT(*) as count FROM borrow_records br
+          JOIN book_copies bc ON br.book_copy_id = bc.id
+          WHERE bc.book_id = ? AND br.status = 'borrowed'
+        `;
+        const [borrowCheckResult] = await connection.execute(borrowCheckQuery, [bookId]);
+        const activeBorrows = borrowCheckResult[0]?.count || 0;
+
+        if (activeBorrows > 0) {
+          await connection.rollback();
+          return res.status(400).json({
+            error: `Cannot delete book: ${activeBorrows} copy(ies) are currently borrowed. Please wait for all copies to be returned.`
+          });
+        }
+
+        // Delete book copies first (due to foreign key constraint)
+        const deleteCopiesQuery = `DELETE FROM book_copies WHERE book_id = ?`;
+        await connection.execute(deleteCopiesQuery, [bookId]);
+
+        // Delete the book
+        const deleteBookQuery = `DELETE FROM books WHERE id = ?`;
+        const [result] = await connection.execute(deleteBookQuery, [bookId]);
+
+        if (result.affectedRows === 0) {
+          await connection.rollback();
+          return res.status(404).json({ error: 'Book not found' });
+        }
+
+        await connection.commit();
+
+        res.json({
+          message: 'Book and all its copies deleted successfully',
+          book_id: bookId
+        });
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+    }
+  } catch (error) {
+    console.error('Error deleting book:', error);
+    res.status(500).json({ error: 'Failed to delete book' });
+  }
+});
+
+app.put('/api/books/:bookId', async (req, res) => {
+  try {
+    const { bookId } = req.params;
+    const { title, author, category, total_copies } = req.body;
+
+    if (useMockData) {
+      // Mock update
+      res.json({
+        id: bookId,
+        title,
+        author,
+        category,
+        total_copies,
+        updated_at: new Date().toISOString()
+      });
+    } else {
+      // Start transaction
+      const connection = await pool.getConnection();
+      await connection.beginTransaction();
+
+      try {
+        // Update book metadata
+        const updateBookQuery = `
+          UPDATE books
+          SET title = ?, author = ?, category = ?, updated_at = NOW()
+          WHERE id = ?
+        `;
+        const [result] = await connection.execute(updateBookQuery, [
+          title,
+          author,
+          category || null,
+          bookId
+        ]);
+
+        if (result.affectedRows === 0) {
+          await connection.rollback();
+          return res.status(404).json({ error: 'Book not found' });
+        }
+
+        // Get current number of copies
+        const countQuery = `SELECT COUNT(*) as count FROM book_copies WHERE book_id = ?`;
+        const [countResult] = await connection.execute(countQuery, [bookId]);
+        const currentCopies = countResult[0]?.count || 0;
+
+        // If total_copies changed, we need to add or remove copies
+        if (total_copies > currentCopies) {
+          // Add more copies
+          const copiesToAdd = total_copies - currentCopies;
+          const copyInserts = [];
+
+          for (let i = 0; i < copiesToAdd; i++) {
+            const copyId = crypto.randomUUID();
+            const copyIsbn = await generateUniqueISBN();
+            copyInserts.push([copyId, bookId, copyIsbn, 'available', null]);
+          }
+
+          if (copyInserts.length > 0) {
+            const addCopiesQuery = `
+              INSERT INTO book_copies (
+                id, book_id, isbn, status, condition_notes,
+                created_at, updated_at
+              ) VALUES ${copyInserts.map(() => '(?, ?, ?, ?, ?, NOW(), NOW())').join(', ')}
+            `;
+            const flattenedValues = copyInserts.flat();
+            await connection.execute(addCopiesQuery, flattenedValues);
+          }
+        } else if (total_copies < currentCopies) {
+          // Remove excess copies (only if they're available)
+          const copiesToRemove = currentCopies - total_copies;
+
+          // First, get available copies to remove
+          const availableCopiesQuery = `
+            SELECT id FROM book_copies
+            WHERE book_id = ? AND status = 'available'
+            LIMIT ?
+          `;
+          const [availableCopiesResult] = await connection.execute(availableCopiesQuery, [bookId, copiesToRemove]);
+
+          if (availableCopiesResult.length > 0) {
+            const copyIdsToRemove = availableCopiesResult.map(row => row.id);
+            const removeCopiesQuery = `DELETE FROM book_copies WHERE id IN (${copyIdsToRemove.map(() => '?').join(', ')})`;
+            await connection.execute(removeCopiesQuery, copyIdsToRemove);
+          }
+        }
+
+        await connection.commit();
+
+        // Get updated book data
+        const selectQuery = `
+          SELECT
+            b.*,
+            COUNT(bc.id) as total_copies,
+            COUNT(CASE WHEN bc.status = 'available' THEN 1 END) as available_copies,
+            JSON_ARRAYAGG(
+              JSON_OBJECT(
+                'id', bc.id,
+                'isbn', bc.isbn,
+                'status', bc.status,
+                'condition_notes', bc.condition_notes
+              )
+            ) as copies
+          FROM books b
+          LEFT JOIN book_copies bc ON b.id = bc.book_id
+          WHERE b.id = ?
+          GROUP BY b.id
+        `;
+        const [updatedBookResult] = await pool.execute(selectQuery, [bookId]);
+
+        res.json(updatedBookResult[0]);
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+    }
+  } catch (error) {
+    console.error('Error updating book:', error);
+    res.status(500).json({ error: 'Failed to update book' });
+  }
+});
+
 // Students routes
 app.get('/api/students', async (req, res) => {
   try {

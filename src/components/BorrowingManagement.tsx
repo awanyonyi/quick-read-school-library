@@ -549,52 +549,53 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Borrowing Management</h2>
-          <p className="text-gray-600">Issue and return books, manage borrowing records</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Borrowing Management</h2>
+          <p className="text-gray-600 text-sm sm:text-base">Issue and return books, manage borrowing records</p>
         </div>
         <Dialog open={isIssueDialogOpen} onOpenChange={setIsIssueDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button className="w-full sm:w-auto h-10 sm:h-9 text-sm sm:text-base">
+              <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
               Issue Book
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-primary" />
-                Issue Book with Biometric Authentication
+          <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto mx-4 p-4 sm:p-6">
+            <DialogHeader className="space-y-3">
+              <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <Shield className="h-5 w-5 text-primary flex-shrink-0" />
+                <span className="text-left">Issue Book with Biometric Authentication</span>
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-sm text-left">
                 Select a book and set borrowing period. Student identity will be verified using biometric authentication.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-6 py-4">
+
+            <div className="space-y-6 py-4">
               {/* Book Selection with Search */}
               <div className="space-y-3">
-                <label className="text-sm font-medium">Select Book</label>
+                <label className="text-sm font-medium block">Select Book</label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 flex-shrink-0" />
                   <Input
                     placeholder="Search books by title or author..."
                     value={bookSearchQuery}
                     onChange={(e) => setBookSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 w-full"
                   />
                 </div>
                 <Select value={selectedBookId} onValueChange={setSelectedBookId}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose a book..." />
                   </SelectTrigger>
-                  <SelectContent className="max-h-60">
+                  <SelectContent className="max-h-48 sm:max-h-60 w-full">
                     {filteredBooks.length > 0 ? (
                       filteredBooks.map((book) => (
-                        <SelectItem key={book.id} value={book.id}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{book.title}</span>
-                            <span className="text-sm text-gray-500">
+                        <SelectItem key={book.id} value={book.id} className="w-full">
+                          <div className="flex flex-col w-full">
+                            <span className="font-medium truncate">{book.title}</span>
+                            <span className="text-sm text-gray-500 truncate">
                               by {book.author} • ISBN: {book.isbn || 'N/A'}
                             </span>
                             <span className="text-sm text-gray-500">
@@ -604,7 +605,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                         </SelectItem>
                       ))
                     ) : (
-                      <div className="p-2 text-sm text-gray-500 text-center">
+                      <div className="p-3 text-sm text-gray-500 text-center w-full">
                         {bookSearchQuery ? 'No books found matching your search' : 'No available books'}
                       </div>
                     )}
@@ -613,114 +614,124 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
               </div>
 
               {/* Biometric Authentication Notice */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Shield className="h-4 w-4 text-blue-600" />
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+                <div className="flex items-start gap-2 mb-2">
+                  <Shield className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
                   <span className="font-medium text-blue-800 text-sm">Biometric Authentication Required</span>
                 </div>
-                <p className="text-xs text-blue-700">
+                <p className="text-xs text-blue-700 leading-relaxed">
                   Student identity will be verified using biometric authentication (fingerprint or face recognition) before book issuance.
                 </p>
               </div>
 
-               {/* Borrowing Period Selection */}
-               <div className="space-y-3">
-                 <label className="text-sm font-medium">Borrowing Period</label>
-                 <div className="flex space-x-2">
-                   <Input
-                     type="number"
-                     placeholder="Enter period"
-                     value={borrowPeriodValue}
-                     onChange={(e) => setBorrowPeriodValue(e.target.value)}
-                     min="1"
-                     className="flex-1"
-                   />
-                   <Select value={borrowPeriodUnit} onValueChange={setBorrowPeriodUnit}>
-                     <SelectTrigger className="w-32">
-                       <SelectValue />
-                     </SelectTrigger>
-                     <SelectContent>
-                       <SelectItem value="hours">Hours</SelectItem>
-                       <SelectItem value="days">Days</SelectItem>
-                       <SelectItem value="weeks">Weeks</SelectItem>
-                       <SelectItem value="months">Months</SelectItem>
-                       <SelectItem value="years">Years</SelectItem>
-                     </SelectContent>
-                   </Select>
-                 </div>
-                 {borrowPeriodValue && (
-                   <p className="text-sm text-muted-foreground">
-                     Book will be due in {borrowPeriodValue} {borrowPeriodUnit}
-                   </p>
-                 )}
-               </div>
-             </div>
-             <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
-               <Button variant="outline" onClick={() => setIsIssueDialogOpen(false)} className="w-full sm:w-auto">
-                 Cancel
-               </Button>
-               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                 <Button
-                   variant="outline"
-                   onClick={() => {
-                     if (!selectedBookId || !borrowPeriodValue) {
-                       toast({
-                         title: "Error",
-                         description: "Please select book and borrowing period",
-                         variant: "destructive"
-                       });
-                       return;
-                     }
-                     setPendingIssueData({
-                       bookId: selectedBookId,
-                       borrowPeriod: {
-                         value: parseInt(borrowPeriodValue),
-                         unit: borrowPeriodUnit
-                       }
-                     });
-                     setShowManualStudentSelection(true);
-                   }}
-                   className="w-full sm:w-auto flex items-center gap-2"
-                 >
-                   <User className="h-4 w-4" />
-                   Manual Selection
-                 </Button>
-                 <Button onClick={handleIssueBook} className="w-full sm:w-auto flex items-center gap-2">
-                   <Shield className="h-4 w-4" />
-                   Biometric Verification
-                 </Button>
-               </div>
-             </DialogFooter>
+              {/* Borrowing Period Selection */}
+              <div className="space-y-3">
+                <label className="text-sm font-medium block">Borrowing Period</label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Enter period"
+                    value={borrowPeriodValue}
+                    onChange={(e) => setBorrowPeriodValue(e.target.value)}
+                    min="1"
+                    className="flex-1 w-full"
+                  />
+                  <Select value={borrowPeriodUnit} onValueChange={setBorrowPeriodUnit}>
+                    <SelectTrigger className="w-full sm:w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hours">Hours</SelectItem>
+                      <SelectItem value="days">Days</SelectItem>
+                      <SelectItem value="weeks">Weeks</SelectItem>
+                      <SelectItem value="months">Months</SelectItem>
+                      <SelectItem value="years">Years</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {borrowPeriodValue && (
+                  <p className="text-sm text-muted-foreground">
+                    Book will be due in {borrowPeriodValue} {borrowPeriodUnit}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter className="flex flex-col-reverse gap-3 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setIsIssueDialogOpen(false)}
+                className="w-full h-11 text-base font-medium"
+              >
+                Cancel
+              </Button>
+
+              <div className="flex flex-col sm:flex-row gap-3 w-full">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (!selectedBookId || !borrowPeriodValue) {
+                      toast({
+                        title: "Error",
+                        description: "Please select book and borrowing period",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    setPendingIssueData({
+                      bookId: selectedBookId,
+                      borrowPeriod: {
+                        value: parseInt(borrowPeriodValue),
+                        unit: borrowPeriodUnit
+                      }
+                    });
+                    setShowManualStudentSelection(true);
+                  }}
+                  className="flex-1 h-11 text-base font-medium flex items-center justify-center gap-2"
+                >
+                  <User className="h-4 w-4" />
+                  Manual Selection
+                </Button>
+
+                <Button
+                  onClick={handleIssueBook}
+                  className="flex-1 h-11 text-base font-medium flex items-center justify-center gap-2"
+                >
+                  <Shield className="h-4 w-4" />
+                  Biometric Verification
+                </Button>
+              </div>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <Card className="w-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Borrowings</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{activeBorrowRecords.length}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="w-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Overdue Books</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{overdueRecords.length}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="w-full sm:col-span-2 lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Available Books</CardTitle>
-            <BookOpen className="h-4 w-4 text-green-600" />
+            <BookOpen className="h-4 w-4 text-green-600 flex-shrink-0" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{availableBooks.length}</div>
@@ -743,48 +754,48 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
               const fine = isOverdue ? calculateFine(record.due_date) : 0;
 
               return (
-                <div key={record.id} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
+                <div key={record.id} className="border rounded-lg p-3 sm:p-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
+                    <div className="flex-1 w-full">
                       <div className="flex items-start space-x-3">
-                        <div className={`p-2 rounded-lg ${isOverdue ? 'bg-red-100' : 'bg-blue-100'}`}>
-                          <BookOpen className={`h-5 w-5 ${isOverdue ? 'text-red-600' : 'text-blue-600'}`} />
+                        <div className={`p-2 rounded-lg flex-shrink-0 ${isOverdue ? 'bg-red-100' : 'bg-blue-100'}`}>
+                          <BookOpen className={`h-4 w-4 sm:h-5 sm:w-5 ${isOverdue ? 'text-red-600' : 'text-blue-600'}`} />
                         </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold">{book?.title || 'Unknown Book'}</h3>
-                          <p className="text-gray-600">by {book?.author || 'Unknown Author'}</p>
-                          <p className="text-sm text-gray-500">ISBN: {book?.isbn || 'N/A'}</p>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-sm sm:text-base truncate">{book?.title || 'Unknown Book'}</h3>
+                          <p className="text-gray-600 text-xs sm:text-sm truncate">by {book?.author || 'Unknown Author'}</p>
+                          <p className="text-xs sm:text-sm text-gray-500 truncate">ISBN: {book?.isbn || 'N/A'}</p>
                           <div className="flex items-center space-x-2 mt-2">
-                            <User className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm">{student?.name || 'Unknown Student'}</span>
-                            <span className="text-sm text-gray-500">({student?.admission_number})</span>
+                            <User className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 flex-shrink-0" />
+                            <span className="text-xs sm:text-sm truncate">{student?.name || 'Unknown Student'}</span>
+                            <span className="text-xs sm:text-sm text-gray-500 truncate">({student?.admission_number})</span>
                           </div>
-                          <div className="flex items-center space-x-4 mt-2">
-                            <span className="text-sm">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-2">
+                            <span className="text-xs sm:text-sm">
                               Borrowed: {new Date(record.borrow_date).toLocaleDateString()}
                             </span>
-                            <span className="text-sm">
-                              Due: {new Date(record.due_date).toLocaleString()}
+                            <span className="text-xs sm:text-sm">
+                              Due: {new Date(record.due_date).toLocaleDateString()}
                             </span>
                           </div>
                           {fine > 0 && (
-                            <p className="text-sm text-red-600 font-medium mt-1">
+                            <p className="text-xs sm:text-sm text-red-600 font-medium mt-1">
                               Fine: KES {fine.toLocaleString()}
                             </p>
                           )}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={isOverdue ? 'destructive' : 'default'}>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+                      <Badge variant={isOverdue ? 'destructive' : 'default'} className="w-fit">
                         {isOverdue ? 'Overdue' : 'Active'}
                       </Badge>
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         onClick={() => handleReturnBook(record.id)}
-                        className="bg-green-600 hover:bg-green-700"
+                        className="bg-green-600 hover:bg-green-700 w-full sm:w-auto h-8 sm:h-9 text-xs sm:text-sm"
                       >
-                        <CheckCircle className="h-4 w-4 mr-1" />
+                        <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                         Return
                       </Button>
                     </div>
@@ -877,41 +888,41 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
 
       {/* Manual Student Selection Dialog */}
       <Dialog open={showManualStudentSelection} onOpenChange={setShowManualStudentSelection}>
-        <DialogContent className="sm:max-w-[600px] mx-4 max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <User className="h-5 w-5 text-primary" />
-              Manual Student Selection
+        <DialogContent className="w-[95vw] max-w-[700px] max-h-[90vh] overflow-y-auto mx-4 p-4 sm:p-6">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <User className="h-5 w-5 text-primary flex-shrink-0" />
+              <span className="text-left">Manual Student Selection</span>
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-sm text-left">
               Select a student manually when biometric verification is not available
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Search Input */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Search Students</label>
+              <label className="text-sm font-medium block">Search Students</label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 flex-shrink-0" />
                 <Input
                   placeholder="Search by admission number, name, email, or class..."
                   value={manualStudentSearchQuery}
                   onChange={(e) => setManualStudentSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 w-full"
                 />
               </div>
             </div>
 
             {/* Student List */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Select Student</label>
-              <div className="max-h-60 overflow-y-auto border rounded-lg">
+              <label className="text-sm font-medium block">Select Student</label>
+              <div className="max-h-64 sm:max-h-80 overflow-y-auto border rounded-lg bg-gray-50">
                 {filteredManualStudents.length > 0 ? (
                   filteredManualStudents.map((student) => (
                     <div
                       key={student.id}
-                      className={`p-3 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
+                      className={`p-3 sm:p-4 border-b cursor-pointer hover:bg-gray-100 transition-colors active:bg-gray-200 ${
                         manualSelectedStudentId === student.id ? 'bg-blue-50 border-blue-200' : ''
                       }`}
                       onClick={() => setManualSelectedStudentId(student.id)}
@@ -925,9 +936,9 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                           }`} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-sm truncate">{student.name}</h3>
-                          <p className="text-gray-600 text-xs truncate">{student.email}</p>
-                          <div className="flex items-center space-x-3 mt-1">
+                          <h3 className="font-semibold text-sm sm:text-base truncate">{student.name}</h3>
+                          <p className="text-gray-600 text-xs sm:text-sm truncate">{student.email}</p>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
                             <span className="text-xs">
                               <span className="font-medium">Adm:</span> {student.admission_number}
                             </span>
@@ -938,7 +949,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                         </div>
                         {manualSelectedStudentId === student.id && (
                           <div className="flex-shrink-0">
-                            <div className="w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
+                            <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
                               <CheckCircle className="h-3 w-3 text-white" />
                             </div>
                           </div>
@@ -947,7 +958,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                     </div>
                   ))
                 ) : (
-                  <div className="p-4 text-center text-gray-500">
+                  <div className="p-6 text-center text-gray-500">
                     {manualStudentSearchQuery ? 'No students found matching your search' : 'No students available'}
                   </div>
                 )}
@@ -956,19 +967,21 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
 
             {/* Selected Student Info */}
             {manualSelectedStudentId && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="h-4 w-4 text-blue-600" />
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle className="h-4 w-4 text-blue-600 flex-shrink-0" />
                   <span className="font-medium text-blue-800 text-sm">Selected Student</span>
                 </div>
                 {(() => {
                   const selectedStudent = students.find(s => s.id === manualSelectedStudentId);
                   return selectedStudent ? (
-                    <div className="text-sm space-y-1">
-                      <div><span className="font-medium">Name:</span> {selectedStudent.name}</div>
-                      <div><span className="font-medium">Admission:</span> {selectedStudent.admission_number}</div>
-                      <div><span className="font-medium">Class:</span> {selectedStudent.class}</div>
-                      <div><span className="font-medium">Email:</span> {selectedStudent.email || 'Not provided'}</div>
+                    <div className="text-sm space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div><span className="font-medium">Name:</span> {selectedStudent.name}</div>
+                        <div><span className="font-medium">Admission:</span> {selectedStudent.admission_number}</div>
+                        <div><span className="font-medium">Class:</span> {selectedStudent.class}</div>
+                        <div><span className="font-medium">Email:</span> {selectedStudent.email || 'Not provided'}</div>
+                      </div>
                     </div>
                   ) : null;
                 })()}
@@ -976,7 +989,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
             )}
           </div>
 
-          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+          <DialogFooter className="flex flex-col-reverse gap-3 pt-4 border-t">
             <Button
               variant="outline"
               onClick={() => {
@@ -985,16 +998,16 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                 setManualStudentSearchQuery('');
                 setPendingIssueData(null);
               }}
-              className="w-full sm:w-auto"
+              className="w-full h-11 text-base font-medium"
             >
               Cancel
             </Button>
             <Button
               onClick={handleManualStudentSelection}
               disabled={!manualSelectedStudentId}
-              className="w-full sm:w-auto"
+              className="w-full h-11 text-base font-medium flex items-center justify-center gap-2"
             >
-              <CheckCircle className="h-4 w-4 mr-2" />
+              <CheckCircle className="h-4 w-4" />
               Issue Book to Selected Student
             </Button>
           </DialogFooter>
