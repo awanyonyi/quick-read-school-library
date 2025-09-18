@@ -222,35 +222,94 @@ const calculateDueDate = (
   return borrow.toISOString();
 };
 
-// Function to check and auto-blacklist overdue students
+// Function to check and auto-blacklist overdue students with enhanced logic
 const processOverdueBooks = async () => {
   try {
-    // Update borrow records status to overdue
+    // First, update borrow records status to overdue (with 1-day grace period)
     const overdueQuery = `
       UPDATE borrow_records
       SET status = 'overdue', updated_at = NOW()
-      WHERE status = 'borrowed' AND due_date < NOW()
+      WHERE status = 'borrowed'
+      AND due_date < DATE_SUB(NOW(), INTERVAL 1 DAY)
     `;
-    await pool.execute(overdueQuery);
+    const [overdueResult] = await pool.execute(overdueQuery);
+    const overdueCount = (overdueResult as any).affectedRows || 0;
 
-    // Auto-blacklist students with overdue books
-    const blacklistQuery = `
+    if (overdueCount > 0) {
+      console.log(`📅 Marked ${overdueCount} borrow records as overdue`);
+    }
+
+    // Get students with overdue books and calculate severity
+    const severityQuery = `
+      SELECT
+        br.student_id,
+        s.name as student_name,
+        s.admission_number,
+        COUNT(br.id) as overdue_books_count,
+        MAX(DATEDIFF(NOW(), br.due_date)) as max_days_overdue,
+        AVG(DATEDIFF(NOW(), br.due_date)) as avg_days_overdue
+      FROM borrow_records br
+      JOIN students s ON br.student_id = s.id
+      WHERE br.status = 'overdue'
+      AND br.student_id NOT IN (
+        SELECT id FROM students WHERE blacklisted = TRUE
+      )
+      GROUP BY br.student_id, s.name, s.admission_number
+    `;
+    const [severityResult] = await pool.execute(severityQuery);
+    const overdueStudents = severityResult as any[];
+
+    // Process each overdue student with severity-based blacklisting
+    for (const student of overdueStudents) {
+      let blacklistDays = 7; // Base duration
+      let severity = 'low';
+
+      // Determine severity and duration based on overdue metrics
+      if (student.overdue_books_count >= 3 || student.max_days_overdue >= 14) {
+        blacklistDays = 21; // High severity: 3 weeks
+        severity = 'high';
+      } else if (student.overdue_books_count >= 2 || student.max_days_overdue >= 7) {
+        blacklistDays = 14; // Medium severity: 2 weeks
+        severity = 'medium';
+      }
+
+      // Apply blacklist with severity-based duration
+      const blacklistQuery = `
+        UPDATE students
+        SET
+          blacklisted = TRUE,
+          blacklist_until = DATE_ADD(CURRENT_DATE, INTERVAL ${blacklistDays} DAY),
+          blacklist_reason = 'Automatic blacklist due to overdue books - ${severity} severity (${student.overdue_books_count} books, max ${student.max_days_overdue} days overdue) - ${blacklistDays} day suspension',
+          updated_at = NOW()
+        WHERE id = ?
+      `;
+
+      await pool.execute(blacklistQuery, [student.student_id]);
+
+      console.log(`🚫 Blacklisted student ${student.student_name} (${student.admission_number}) for ${blacklistDays} days - ${severity} severity`);
+    }
+
+    // Auto-unblacklist students who have returned all overdue books
+    const unblacklistQuery = `
       UPDATE students
       SET
-        blacklisted = TRUE,
-        blacklist_until = DATE_ADD(CURRENT_DATE, INTERVAL 7 DAY),
-        blacklist_reason = 'Automatic blacklist due to overdue books',
+        blacklisted = FALSE,
+        blacklist_until = NULL,
+        blacklist_reason = CONCAT('Auto-unblacklisted: All overdue books returned - Previous: ', COALESCE(blacklist_reason, 'No previous reason')),
         updated_at = NOW()
-      WHERE id IN (
-        SELECT DISTINCT br.student_id
-        FROM borrow_records br
-        WHERE br.status = 'overdue'
-        AND br.student_id NOT IN (
-          SELECT id FROM students WHERE blacklisted = TRUE
-        )
+      WHERE blacklisted = TRUE
+      AND id NOT IN (
+        SELECT DISTINCT student_id
+        FROM borrow_records
+        WHERE status = 'overdue'
       )
     `;
-    await pool.execute(blacklistQuery);
+    const [unblacklistResult] = await pool.execute(unblacklistQuery);
+    const unblacklistedCount = (unblacklistResult as any).affectedRows || 0;
+
+    if (unblacklistedCount > 0) {
+      console.log(`✅ Auto-unblacklisted ${unblacklistedCount} students who returned all overdue books`);
+    }
 
   } catch (error) {
     console.error('Error processing overdue books:', error);

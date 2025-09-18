@@ -25,9 +25,11 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
   const [selectedBookId, setSelectedBookId] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [bookSearchQuery, setBookSearchQuery] = useState('');
+  const [isbnSearchQuery, setIsbnSearchQuery] = useState('');
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [borrowPeriodValue, setBorrowPeriodValue] = useState('');
   const [borrowPeriodUnit, setBorrowPeriodUnit] = useState('days');
+  const [isSearchingBooks, setIsSearchingBooks] = useState(false);
   const [showBiometricVerification, setShowBiometricVerification] = useState(false);
   const [showManualStudentSelection, setShowManualStudentSelection] = useState(false);
   const [manualSelectedStudentId, setManualSelectedStudentId] = useState('');
@@ -64,16 +66,58 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
 
   const availableBooks = books.filter(book => book.available_copies > 0);
 
-  // Filter books based on search query
-  const filteredBooks = useMemo(() => {
-    if (!bookSearchQuery.trim()) {
+  // Search books using API
+  const searchBooks = async (query: string) => {
+    if (!query.trim()) {
       return availableBooks;
     }
-    return availableBooks.filter(book =>
-      book.title.toLowerCase().includes(bookSearchQuery.toLowerCase()) ||
-      book.author.toLowerCase().includes(bookSearchQuery.toLowerCase())
-    );
-  }, [availableBooks, bookSearchQuery]);
+
+    setIsSearchingBooks(true);
+    try {
+      const response = await fetch(`http://localhost:3001/api/books/search?q=${encodeURIComponent(query)}`);
+      if (!response.ok) {
+        throw new Error('Search failed');
+      }
+      const searchResults = await response.json();
+
+      // Filter to only show available books
+      return searchResults.filter((book: any) => book.available_copies > 0);
+    } catch (error) {
+      console.error('Book search error:', error);
+      // Fallback to local filtering
+      return availableBooks.filter(book =>
+        book.title.toLowerCase().includes(query.toLowerCase()) ||
+        book.author.toLowerCase().includes(query.toLowerCase()) ||
+        (book.isbn && book.isbn.toLowerCase().includes(query.toLowerCase()))
+      );
+    } finally {
+      setIsSearchingBooks(false);
+    }
+  };
+
+  // Filter books based on search queries
+  const filteredBooks = useMemo(() => {
+    let booksToFilter = availableBooks;
+
+    // If there's a general search query, use API search
+    if (bookSearchQuery.trim()) {
+      // For now, we'll use local filtering since useMemo can't handle async
+      // In a real implementation, you'd use a separate state for search results
+      booksToFilter = booksToFilter.filter(book =>
+        book.title.toLowerCase().includes(bookSearchQuery.toLowerCase()) ||
+        book.author.toLowerCase().includes(bookSearchQuery.toLowerCase())
+      );
+    }
+
+    // If there's an ISBN search query, filter by ISBN
+    if (isbnSearchQuery.trim()) {
+      booksToFilter = booksToFilter.filter(book =>
+        book.isbn && book.isbn.toLowerCase().includes(isbnSearchQuery.toLowerCase())
+      );
+    }
+
+    return booksToFilter;
+  }, [availableBooks, bookSearchQuery, isbnSearchQuery]);
 
   // Filter students based on search query
   const filteredStudents = useMemo(() => {
@@ -278,6 +322,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
       setSelectedBookId('');
       setSelectedStudentId('');
       setBookSearchQuery('');
+      setIsbnSearchQuery('');
       setStudentSearchQuery('');
       setBorrowPeriodValue('');
       setBorrowPeriodUnit('days');
@@ -499,6 +544,7 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
       setSelectedBookId('');
       setSelectedStudentId('');
       setBookSearchQuery('');
+      setIsbnSearchQuery('');
       setStudentSearchQuery('');
       setBorrowPeriodValue('');
       setBorrowPeriodUnit('days');
@@ -576,6 +622,8 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
               {/* Book Selection with Search */}
               <div className="space-y-3">
                 <label className="text-sm font-medium block">Select Book</label>
+
+                {/* General Search */}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 flex-shrink-0" />
                   <Input
@@ -583,6 +631,19 @@ export const BorrowingManagement: React.FC<BorrowingManagementProps> = ({ onUpda
                     value={bookSearchQuery}
                     onChange={(e) => setBookSearchQuery(e.target.value)}
                     className="pl-10 w-full"
+                  />
+                </div>
+
+                {/* ISBN Search */}
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium flex-shrink-0">
+                    ISBN
+                  </div>
+                  <Input
+                    placeholder="Search by ISBN number..."
+                    value={isbnSearchQuery}
+                    onChange={(e) => setIsbnSearchQuery(e.target.value)}
+                    className="pl-14 w-full"
                   />
                 </div>
                 <Select value={selectedBookId} onValueChange={setSelectedBookId}>

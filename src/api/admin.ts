@@ -1,5 +1,6 @@
 import express from 'express';
-import jwt, { SignOptions, Secret } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
+import type { SignOptions } from 'jsonwebtoken';
 
 type Request = express.Request;
 type Response = express.Response;
@@ -25,15 +26,15 @@ declare global {
 }
 
 // JWT secret - in production, use environment variable
-const JWT_SECRET: Secret = process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production';
+const JWT_SECRET: string = process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production';
 const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN || '8h';
 
 // Hardcoded admin credentials
 const ADMIN_CREDENTIALS = {
-  username: 'admin',
-  password: 'admin123',
+  username: 'Maryland_library',
+  password: 'Sheila_library',
   id: 'admin-1',
-  email: 'admin@school.edu',
+  email: 'admin@maryland.edu',
   role: 'admin'
 };
 

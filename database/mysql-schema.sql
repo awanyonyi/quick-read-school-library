@@ -237,5 +237,23 @@ DELIMITER ;
 -- ON SCHEDULE EVERY 1 DAY STARTS '2024-01-01 00:00:00'
 -- DO CALL auto_blacklist_overdue_students();
 
+-- Admin actions audit log table
+CREATE TABLE IF NOT EXISTS admin_actions (
+  id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  admin_id VARCHAR(36) NOT NULL,
+  action_type VARCHAR(50) NOT NULL,
+  target_type VARCHAR(50) NOT NULL,
+  target_id VARCHAR(36) NOT NULL,
+  action_details JSON,
+  ip_address VARCHAR(45),
+  user_agent TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_admin_id (admin_id),
+  INDEX idx_action_type (action_type),
+  INDEX idx_target_type (target_type),
+  INDEX idx_target_id (target_id),
+  INDEX idx_created_at (created_at)
+);
+
 -- Enable event scheduler
 -- SET GLOBAL event_scheduler = ON;

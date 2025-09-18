@@ -26,10 +26,17 @@ const LoginForm = ({ onBackToHome }: LoginFormProps) => {
       return;
     }
 
-    // Basic client-side validation for admin login
-    if (username === 'admin' || /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-      if (password.length < 8) {
-        setError('Admin password must be at least 8 characters long');
+    // Basic client-side validation
+    if (username === 'Maryland_library') {
+      // Admin login validation
+      if (password.length < 6) {
+        setError('Admin password must be at least 6 characters long');
+        return;
+      }
+    } else {
+      // Student login validation (if implemented)
+      if (password.length < 3) {
+        setError('Password must be at least 3 characters long');
         return;
       }
     }

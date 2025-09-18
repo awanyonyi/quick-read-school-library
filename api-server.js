@@ -598,6 +598,105 @@ app.delete('/api/students/:studentId', async (req, res) => {
   }
 });
 
+// Unblacklist a student (Admin only)
+app.put('/api/students/:studentId/unblacklist', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { reason, adminId } = req.body;
+
+    // Validate required fields
+    if (!reason || reason.trim().length < 10) {
+      return res.status(400).json({
+        error: 'Unblacklist reason is required and must be at least 10 characters long'
+      });
+    }
+
+    if (!adminId) {
+      return res.status(400).json({
+        error: 'Admin ID is required for unblacklist operation'
+      });
+    }
+
+    if (useMockData) {
+      // Mock unblacklist
+      res.json({
+        success: true,
+        message: 'Student unblacklisted successfully (mock)',
+        unblacklist_reason: reason.trim(),
+        unblacklist_date: new Date().toISOString()
+      });
+    } else {
+      // First, get current student data to log the change
+      const selectQuery = `SELECT * FROM students WHERE id = ?`;
+      const [rows] = await pool.execute(selectQuery, [studentId]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Student not found' });
+      }
+
+      const student = rows[0];
+
+      if (!student.blacklisted) {
+        return res.status(400).json({
+          error: 'Student is not currently blacklisted'
+        });
+      }
+
+      // Update student to remove blacklist
+      const updateQuery = `
+        UPDATE students
+        SET
+          blacklisted = FALSE,
+          blacklist_until = NULL,
+          blacklist_reason = CONCAT('Manually unblacklisted by admin - Reason: ', ?, ' - Previous: ', COALESCE(blacklist_reason, 'No previous reason')),
+          updated_at = NOW()
+        WHERE id = ?
+      `;
+
+      await pool.execute(updateQuery, [reason.trim(), studentId]);
+
+      // Log the unblacklist action
+      const logQuery = `
+        INSERT INTO admin_actions (
+          id, admin_id, action_type, target_type, target_id,
+          action_details, created_at
+        ) VALUES (?, ?, 'unblacklist', 'student', ?, ?, NOW())
+      `;
+
+      const logId = crypto.randomUUID();
+      const actionDetails = JSON.stringify({
+        student_name: student.name,
+        student_admission: student.admission_number,
+        previous_blacklist_reason: student.blacklist_reason,
+        unblacklist_reason: reason.trim(),
+        unblacklist_date: new Date().toISOString()
+      });
+
+      try {
+        await pool.execute(logQuery, [logId, adminId, studentId, actionDetails]);
+      } catch (logError) {
+        console.warn('Failed to log unblacklist action:', logError);
+        // Don't fail the unblacklist operation if logging fails
+      }
+
+      // Fetch updated student data
+      const [updatedRows] = await pool.execute(selectQuery, [studentId]);
+
+      console.log(`✅ Student ${student.name} (${studentId}) unblacklisted by admin ${adminId}: ${reason}`);
+
+      res.json({
+        ...updatedRows[0],
+        unblacklist_success: true,
+        unblacklist_reason: reason.trim(),
+        unblacklist_date: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    console.error('Error unblacklisting student:', error);
+    res.status(500).json({ error: 'Failed to unblacklist student' });
+  }
+});
+
 // Get all enrolled biometric data for duplicate checking
 app.get('/api/students/biometric-data', async (req, res) => {
   try {
@@ -728,7 +827,10 @@ app.post('/api/biometric-verification', async (req, res) => {
       verified_by,
       verification_timestamp,
       borrow_record_id,
-      additional_data
+      additional_data,
+      fingerprint_image,
+      face_image,
+      device_info
     } = req.body;
 
     if (useMockData) {
@@ -740,7 +842,11 @@ app.post('/api/biometric-verification', async (req, res) => {
         verification_status,
         verification_timestamp
       });
-      res.json({ success: true, message: 'Biometric verification logged successfully (mock)' });
+      res.json({
+        success: true,
+        message: 'Biometric verification logged successfully (mock)',
+        log_id: 'mock-' + Date.now()
+      });
     } else {
       const query = `
         INSERT INTO biometric_verification_logs (
@@ -766,10 +872,59 @@ app.post('/api/biometric-verification', async (req, res) => {
 
       await pool.execute(query, values);
 
+      // Store verification images if provided
+      if (fingerprint_image || face_image) {
+        const imagePromises = [];
+
+        if (fingerprint_image) {
+          imagePromises.push(
+            pool.execute(`
+              INSERT INTO biometric_verification_images (
+                id, verification_log_id, student_id, image_type,
+                image_data, image_format, device_info
+              ) VALUES (?, ?, ?, 'fingerprint', ?, 'png', ?)
+            `, [
+              crypto.randomUUID(),
+              logId,
+              student_id,
+              Buffer.from(fingerprint_image.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64'),
+              device_info ? JSON.stringify(device_info) : null
+            ])
+          );
+        }
+
+        if (face_image) {
+          imagePromises.push(
+            pool.execute(`
+              INSERT INTO biometric_verification_images (
+                id, verification_log_id, student_id, image_type,
+                image_data, image_format, device_info
+              ) VALUES (?, ?, ?, 'face', ?, 'png', ?)
+            `, [
+              crypto.randomUUID(),
+              logId,
+              student_id,
+              Buffer.from(face_image.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64'),
+              device_info ? JSON.stringify(device_info) : null
+            ])
+          );
+        }
+
+        // Execute image storage operations
+        try {
+          await Promise.all(imagePromises);
+          console.log(`✅ Stored ${imagePromises.length} biometric verification images for log ${logId}`);
+        } catch (imageError) {
+          console.warn('⚠️ Failed to store biometric verification images:', imageError);
+          // Don't fail the logging if image storage fails
+        }
+      }
+
       res.json({
         success: true,
         message: 'Biometric verification logged successfully',
-        log_id: logId
+        log_id: logId,
+        images_stored: !!(fingerprint_image || face_image)
       });
     }
   } catch (error) {
@@ -782,7 +937,15 @@ app.post('/api/biometric-verification', async (req, res) => {
 app.put('/api/students/:studentId/biometric', async (req, res) => {
   try {
     const { studentId } = req.params;
-    const { biometric_enrolled, biometric_id, biometric_data } = req.body;
+    const {
+      biometric_enrolled,
+      biometric_id,
+      biometric_data,
+      fingerprint_image,
+      face_image,
+      image_format = 'png',
+      image_quality = 90
+    } = req.body;
 
     if (useMockData) {
       // Mock biometric update
@@ -814,14 +977,38 @@ app.put('/api/students/:studentId/biometric', async (req, res) => {
             biometric_enrolled = ?,
             biometric_id = ?,
             biometric_data = ?,
+            biometric_fingerprint_image = ?,
+            biometric_face_image = ?,
+            biometric_image_format = ?,
+            biometric_image_quality = ?,
+            biometric_last_capture = NOW(),
             updated_at = NOW()
           WHERE id = ?
         `;
+
+        // Convert base64 images to Buffer if provided
+        let fingerprintBuffer = null;
+        let faceBuffer = null;
+
+        if (fingerprint_image) {
+          // Remove data URL prefix if present (e.g., "data:image/png;base64,")
+          const base64Data = fingerprint_image.replace(/^data:image\/[a-z]+;base64,/, '');
+          fingerprintBuffer = Buffer.from(base64Data, 'base64');
+        }
+
+        if (face_image) {
+          const base64Data = face_image.replace(/^data:image\/[a-z]+;base64,/, '');
+          faceBuffer = Buffer.from(base64Data, 'base64');
+        }
 
         const values = [
           biometric_enrolled,
           biometric_id || null,
           biometric_data ? JSON.stringify(biometric_data) : null,
+          fingerprintBuffer,
+          faceBuffer,
+          image_format,
+          image_quality,
           studentId
         ];
 
@@ -833,7 +1020,11 @@ app.put('/api/students/:studentId/biometric', async (req, res) => {
 
         res.json({
           success: true,
-          message: 'Biometric data updated successfully'
+          message: 'Biometric data and images updated successfully',
+          images_stored: {
+            fingerprint: !!fingerprintBuffer,
+            face: !!faceBuffer
+          }
         });
       } catch (columnError) {
         // If biometric columns don't exist, return appropriate error
@@ -849,10 +1040,227 @@ app.put('/api/students/:studentId/biometric', async (req, res) => {
   }
 });
 
+// Get biometric images for a student
+app.get('/api/students/:studentId/biometric-images', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    if (useMockData) {
+      res.json({
+        fingerprint_image: null,
+        face_image: null,
+        image_format: 'png',
+        last_capture: null
+      });
+    } else {
+      const query = `
+        SELECT
+          biometric_fingerprint_image,
+          biometric_face_image,
+          biometric_image_format,
+          biometric_last_capture
+        FROM students
+        WHERE id = ?
+      `;
+
+      const [rows] = await pool.execute(query, [studentId]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Student not found' });
+      }
+
+      const student = rows[0];
+
+      // Convert BLOB data to base64 for JSON response
+      const response = {
+        fingerprint_image: student.biometric_fingerprint_image
+          ? `data:image/${student.biometric_image_format || 'png'};base64,${student.biometric_fingerprint_image.toString('base64')}`
+          : null,
+        face_image: student.biometric_face_image
+          ? `data:image/${student.biometric_image_format || 'png'};base64,${student.biometric_face_image.toString('base64')}`
+          : null,
+        image_format: student.biometric_image_format || 'png',
+        last_capture: student.biometric_last_capture
+      };
+
+      res.json(response);
+    }
+  } catch (error) {
+    console.error('Error fetching biometric images:', error);
+    res.status(500).json({ error: 'Failed to fetch biometric images' });
+  }
+});
+
+// Store biometric verification images
+app.post('/api/biometric-verification/images', async (req, res) => {
+  try {
+    const {
+      verification_log_id,
+      student_id,
+      image_type,
+      image_data,
+      image_format = 'png',
+      image_quality = 90,
+      device_info
+    } = req.body;
+
+    if (!student_id || !image_data || !image_type) {
+      return res.status(400).json({
+        error: 'Missing required fields: student_id, image_data, image_type'
+      });
+    }
+
+    if (useMockData) {
+      res.json({
+        success: true,
+        message: 'Biometric verification image stored successfully (mock)',
+        image_id: 'mock-' + Date.now()
+      });
+    } else {
+      // Convert base64 image to Buffer
+      const base64Data = image_data.replace(/^data:image\/[a-z]+;base64,/, '');
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+
+      const query = `
+        INSERT INTO biometric_verification_images (
+          id, verification_log_id, student_id, image_type,
+          image_data, image_format, image_quality, device_info
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      const imageId = crypto.randomUUID();
+      const values = [
+        imageId,
+        verification_log_id || null,
+        student_id,
+        image_type,
+        imageBuffer,
+        image_format,
+        image_quality,
+        device_info ? JSON.stringify(device_info) : null
+      ];
+
+      await pool.execute(query, values);
+
+      res.json({
+        success: true,
+        message: 'Biometric verification image stored successfully',
+        image_id: imageId
+      });
+    }
+  } catch (error) {
+    console.error('Error storing biometric verification image:', error);
+    res.status(500).json({ error: 'Failed to store biometric verification image' });
+  }
+});
+
+// Get biometric verification images
+app.get('/api/biometric-verification/images', async (req, res) => {
+  try {
+    const { student_id, verification_log_id, image_type, limit = 10 } = req.query;
+
+    if (useMockData) {
+      res.json([]);
+    } else {
+      let query = `
+        SELECT
+          id, verification_log_id, student_id, image_type,
+          image_format, image_quality, capture_timestamp,
+          verification_status, device_info, created_at
+        FROM biometric_verification_images
+        WHERE 1=1
+      `;
+
+      const params = [];
+
+      if (student_id) {
+        query += ' AND student_id = ?';
+        params.push(student_id);
+      }
+
+      if (verification_log_id) {
+        query += ' AND verification_log_id = ?';
+        params.push(verification_log_id);
+      }
+
+      if (image_type) {
+        query += ' AND image_type = ?';
+        params.push(image_type);
+      }
+
+      query += ' ORDER BY capture_timestamp DESC LIMIT ?';
+      params.push(parseInt(limit));
+
+      const [rows] = await pool.execute(query, params);
+
+      // Convert image data to base64 for response (without the actual image data for list view)
+      const images = rows.map(row => ({
+        ...row,
+        has_image_data: !!row.image_data,
+        image_size: row.image_data ? row.image_data.length : 0,
+        // Remove actual image data from list response for performance
+        image_data: undefined
+      }));
+
+      res.json(images);
+    }
+  } catch (error) {
+    console.error('Error fetching biometric verification images:', error);
+    res.status(500).json({ error: 'Failed to fetch biometric verification images' });
+  }
+});
+
+// Get specific biometric verification image
+app.get('/api/biometric-verification/images/:imageId', async (req, res) => {
+  try {
+    const { imageId } = req.params;
+
+    if (useMockData) {
+      res.status(404).json({ error: 'Image not found (mock)' });
+    } else {
+      const query = `
+        SELECT
+          id, verification_log_id, student_id, image_type,
+          image_data, image_format, image_quality, capture_timestamp,
+          verification_status, device_info, created_at
+        FROM biometric_verification_images
+        WHERE id = ?
+      `;
+
+      const [rows] = await pool.execute(query, [imageId]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Biometric verification image not found' });
+      }
+
+      const image = rows[0];
+
+      // Convert image data to base64
+      const response = {
+        ...image,
+        image_data: image.image_data
+          ? `data:image/${image.image_format || 'png'};base64,${image.image_data.toString('base64')}`
+          : null
+      };
+
+      res.json(response);
+    }
+  } catch (error) {
+    console.error('Error fetching biometric verification image:', error);
+    res.status(500).json({ error: 'Failed to fetch biometric verification image' });
+  }
+});
+
 // Biometric verification route
 app.post('/api/biometric/verify', async (req, res) => {
   try {
-    const { fingerprint } = req.body;
+    const {
+      fingerprint,
+      fingerprint_image,
+      face_image,
+      device_info,
+      verification_type = 'verification'
+    } = req.body;
 
     if (!fingerprint) {
       return res.status(400).json({ error: 'Missing fingerprint data' });
@@ -918,24 +1326,88 @@ app.post('/api/biometric/verify', async (req, res) => {
         }
       }
 
-      if (matchedStudent) {
-        // Log successful verification
-        await pool.execute(`
-          INSERT INTO biometric_verification_logs (
-            id, student_id, verification_type, verification_method,
-            verification_status, verified_by, verification_timestamp,
-            additional_data, created_at, updated_at
-          ) VALUES (?, ?, 'verification', 'fingerprint', 'success', 'system', NOW(), ?, NOW(), NOW())
-        `, [
-          crypto.randomUUID(),
-          matchedStudent.id,
-          JSON.stringify({ fingerprint_length: fingerprint.length })
-        ]);
+      // Create verification log entry
+      const logId = crypto.randomUUID();
+      const verificationStatus = matchedStudent ? 'success' : 'failed';
 
+      const logQuery = `
+        INSERT INTO biometric_verification_logs (
+          id, student_id, verification_type, verification_method,
+          verification_status, verified_by, verification_timestamp,
+          additional_data, created_at, updated_at
+        ) VALUES (?, ?, ?, 'fingerprint', ?, 'system', NOW(), ?, NOW(), NOW())
+      `;
+
+      const additionalData = {
+        fingerprint_length: fingerprint.length,
+        device_info: device_info,
+        has_fingerprint_image: !!fingerprint_image,
+        has_face_image: !!face_image
+      };
+
+      await pool.execute(logQuery, [
+        logId,
+        matchedStudent ? matchedStudent.id : null,
+        verification_type,
+        verificationStatus,
+        JSON.stringify(additionalData)
+      ]);
+
+      // Store verification images if provided
+      if (fingerprint_image || face_image) {
+        const imagePromises = [];
+
+        if (fingerprint_image) {
+          imagePromises.push(
+            pool.execute(`
+              INSERT INTO biometric_verification_images (
+                id, verification_log_id, student_id, image_type,
+                image_data, image_format, device_info
+              ) VALUES (?, ?, ?, 'fingerprint', ?, 'png', ?)
+            `, [
+              crypto.randomUUID(),
+              logId,
+              matchedStudent ? matchedStudent.id : null,
+              Buffer.from(fingerprint_image.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64'),
+              device_info ? JSON.stringify(device_info) : null
+            ])
+          );
+        }
+
+        if (face_image) {
+          imagePromises.push(
+            pool.execute(`
+              INSERT INTO biometric_verification_images (
+                id, verification_log_id, student_id, image_type,
+                image_data, image_format, device_info
+              ) VALUES (?, ?, ?, 'face', ?, 'png', ?)
+            `, [
+              crypto.randomUUID(),
+              logId,
+              matchedStudent ? matchedStudent.id : null,
+              Buffer.from(face_image.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64'),
+              device_info ? JSON.stringify(device_info) : null
+            ])
+          );
+        }
+
+        // Execute image storage operations
+        try {
+          await Promise.all(imagePromises);
+          console.log(`✅ Stored ${imagePromises.length} biometric verification images`);
+        } catch (imageError) {
+          console.warn('⚠️ Failed to store biometric verification images:', imageError);
+          // Don't fail the verification if image storage fails
+        }
+      }
+
+      if (matchedStudent) {
         return res.json({
           success: true,
           studentId: matchedStudent.id,
-          message: 'Biometric verification successful'
+          message: 'Biometric verification successful',
+          verification_log_id: logId,
+          images_stored: !!(fingerprint_image || face_image)
         });
       } else {
         // Log failed verification attempt (without student_id since we don't know who it is)
@@ -943,7 +1415,8 @@ app.post('/api/biometric/verify', async (req, res) => {
 
         return res.status(401).json({
           success: false,
-          message: 'Fingerprint not recognized'
+          message: 'Fingerprint not recognized',
+          verification_log_id: logId
         });
       }
     }
@@ -1173,34 +1646,225 @@ app.put('/api/borrowing/:recordId/return', async (req, res) => {
   }
 });
 
-// Admin authentication routes
-import {
-  adminLogin,
-  adminLogout,
-  verifyAdminSession,
-  changeAdminPassword,
-  changeAdminUsername,
-  getAdminProfile,
-  requireAdminAuth
-} from './src/api/admin.ts';
+// Admin authentication routes - inline implementation
+const ADMIN_CREDENTIALS = {
+  username: 'Maryland_library',
+  password: 'Sheila_library',
+  id: 'admin-1',
+  email: 'admin@maryland.edu',
+  role: 'admin'
+};
 
 // Admin login
-app.post('/api/admin/login', adminLogin);
+app.post('/api/admin/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    // Validate input
+    if (!username || !password) {
+      return res.status(400).json({
+        error: 'Username and password are required'
+      });
+    }
+
+    // Check hardcoded credentials
+    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+      // Create JWT token
+      const jwt = await import('jsonwebtoken');
+      const token = jwt.default.sign(
+        {
+          adminId: ADMIN_CREDENTIALS.id,
+          username: ADMIN_CREDENTIALS.username,
+          role: ADMIN_CREDENTIALS.role,
+          sessionToken: 'admin-session-' + Date.now()
+        },
+        process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production',
+        { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+      );
+
+      return res.json({
+        success: true,
+        token: token,
+        user: {
+          id: ADMIN_CREDENTIALS.id,
+          username: ADMIN_CREDENTIALS.username,
+          email: ADMIN_CREDENTIALS.email,
+          role: ADMIN_CREDENTIALS.role,
+          lastLogin: new Date().toISOString()
+        },
+        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
+      });
+    }
+
+    return res.status(401).json({
+      error: 'Invalid credentials'
+    });
+
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Admin logout
-app.post('/api/admin/logout', adminLogout);
+app.post('/api/admin/logout', (req, res) => {
+  res.json({ success: true, message: 'Logged out successfully' });
+});
 
 // Verify admin session
-app.get('/api/admin/verify', verifyAdminSession);
+app.get('/api/admin/verify', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const jwt = await import('jsonwebtoken');
+    const decoded = jwt.default.verify(token, process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production');
+
+    res.json({
+      success: true,
+      user: {
+        id: ADMIN_CREDENTIALS.id,
+        username: ADMIN_CREDENTIALS.username,
+        email: ADMIN_CREDENTIALS.email,
+        role: ADMIN_CREDENTIALS.role,
+        lastLogin: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Session verification error:', error);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
 
 // Get admin profile (protected route)
-app.get('/api/admin/profile', requireAdminAuth, getAdminProfile);
+app.get('/api/admin/profile', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const jwt = await import('jsonwebtoken');
+    jwt.default.verify(token, process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production');
+
+    res.json({
+      success: true,
+      user: {
+        id: ADMIN_CREDENTIALS.id,
+        username: ADMIN_CREDENTIALS.username,
+        email: ADMIN_CREDENTIALS.email,
+        role: ADMIN_CREDENTIALS.role,
+        lastLogin: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
 
 // Change admin password (protected route)
-app.put('/api/admin/password', requireAdminAuth, changeAdminPassword);
+app.put('/api/admin/password', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const jwt = await import('jsonwebtoken');
+    jwt.default.verify(token, process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production');
+
+    const { currentPassword, newPassword } = req.body;
+
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        error: 'Current password and new password are required'
+      });
+    }
+
+    // Check if current password matches
+    if (currentPassword !== ADMIN_CREDENTIALS.password) {
+      return res.status(401).json({
+        error: 'Current password is incorrect'
+      });
+    }
+
+    // Validate new password
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        error: 'New password must be at least 6 characters long'
+      });
+    }
+
+    // Update the hardcoded password
+    ADMIN_CREDENTIALS.password = newPassword;
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('Password change error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Change admin username (protected route)
-app.put('/api/admin/username', requireAdminAuth, changeAdminUsername);
+app.put('/api/admin/username', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const jwt = await import('jsonwebtoken');
+    jwt.default.verify(token, process.env.JWT_SECRET || 'your-super-secure-jwt-secret-change-this-in-production');
+
+    const { currentPassword, newUsername } = req.body;
+
+    // Validate input
+    if (!currentPassword || !newUsername) {
+      return res.status(400).json({
+        error: 'Current password and new username are required'
+      });
+    }
+
+    // Check if current password matches
+    if (currentPassword !== ADMIN_CREDENTIALS.password) {
+      return res.status(401).json({
+        error: 'Current password is incorrect'
+      });
+    }
+
+    // Validate new username
+    if (newUsername.length < 3) {
+      return res.status(400).json({
+        error: 'New username must be at least 3 characters long'
+      });
+    }
+
+    // Update the hardcoded username
+    ADMIN_CREDENTIALS.username = newUsername;
+
+    res.json({
+      success: true,
+      message: 'Username changed successfully'
+    });
+  } catch (error) {
+    console.error('Username change error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Helper function to calculate due date
 const calculateDueDate = (borrowDate, duePeriodValue = 24, duePeriodUnit = 'hours') => {

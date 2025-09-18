@@ -77,38 +77,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
 
       // Check if this is admin login
-      const isAdminAttempt = username === 'admin';
+      const isAdminAttempt = username === 'Maryland_library';
 
       if (isAdminAttempt) {
-        // Hard-coded admin login
-        if (username === 'admin' && password === 'Sheila1234') {
-          const mockAdminData = {
-            success: true,
-            user: {
-              id: 'admin-1',
-              username: 'admin',
-              email: 'admin@school.com'
+        // Call the actual admin API endpoint
+        try {
+          const response = await fetch('http://localhost:3001/api/admin/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-            token: 'mock-admin-token',
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
-          };
+            body: JSON.stringify({ username, password }),
+          });
 
-          const userProfile: UserProfile = {
-            id: mockAdminData.user.id,
-            name: mockAdminData.user.username,
-            role: 'admin',
-            email: mockAdminData.user.email
-          };
+          const data = await response.json();
 
-          // Store both user profile and token
-          setUser(userProfile);
-          localStorage.setItem('library_user', JSON.stringify(userProfile));
-          localStorage.setItem('admin_token', mockAdminData.token);
-          localStorage.setItem('token_expires', mockAdminData.expiresAt);
+          if (response.ok && data.success) {
+            const userProfile: UserProfile = {
+              id: data.user.id,
+              name: data.user.username,
+              role: 'admin',
+              email: data.user.email
+            };
 
-          return { success: true };
-        } else {
-          return { success: false, error: 'Invalid admin credentials' };
+            // Store both user profile and token
+            setUser(userProfile);
+            localStorage.setItem('library_user', JSON.stringify(userProfile));
+            localStorage.setItem('admin_token', data.token);
+            localStorage.setItem('token_expires', data.expiresAt);
+
+            return { success: true };
+          } else {
+            return { success: false, error: data.error || 'Invalid admin credentials' };
+          }
+        } catch (apiError) {
+          console.error('Admin API error:', apiError);
+          return { success: false, error: 'Unable to connect to server. Please check if the API server is running.' };
         }
       }
 
