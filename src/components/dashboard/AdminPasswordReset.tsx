@@ -38,10 +38,10 @@ const AdminPasswordReset = () => {
       return;
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       toast({
         title: "Error",
-        description: "New password must be at least 6 characters long",
+        description: "New password must be at least 8 characters long",
         variant: "destructive"
       });
       return;
@@ -58,12 +58,36 @@ const AdminPasswordReset = () => {
 
     setIsLoading(true);
 
-    // Simulate password change for hard-coded admin
-    setTimeout(() => {
-      if (currentPassword === 'admin123') {
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "You are not logged in as admin",
+          variant: "destructive"
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await fetch('http://localhost:3001/api/admin/password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
         toast({
           title: "Success",
-          description: "Password changed successfully (simulated)",
+          description: "Password changed successfully",
         });
 
         // Clear the form
@@ -73,12 +97,20 @@ const AdminPasswordReset = () => {
       } else {
         toast({
           title: "Error",
-          description: "Current password is incorrect",
+          description: data.error || "Failed to change password",
           variant: "destructive"
         });
       }
+    } catch (error) {
+      console.error('Password change error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to connect to server",
+        variant: "destructive"
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleUsernameChange = async (e: React.FormEvent) => {
@@ -104,12 +136,36 @@ const AdminPasswordReset = () => {
 
     setIsLoading(true);
 
-    // Simulate username change for hard-coded admin
-    setTimeout(() => {
-      if (currentPassword === 'admin123') {
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "You are not logged in as admin",
+          variant: "destructive"
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await fetch('http://localhost:3001/api/admin/username', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newUsername
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
         toast({
           title: "Success",
-          description: "Username changed successfully (simulated)",
+          description: "Username changed successfully. Please use your new username for future logins.",
         });
 
         // Clear the form
@@ -118,12 +174,20 @@ const AdminPasswordReset = () => {
       } else {
         toast({
           title: "Error",
-          description: "Current password is incorrect",
+          description: data.error || "Failed to change username",
           variant: "destructive"
         });
       }
+    } catch (error) {
+      console.error('Username change error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to connect to server",
+        variant: "destructive"
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (

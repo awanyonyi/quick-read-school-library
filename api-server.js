@@ -24,8 +24,6 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  acquireTimeout: 60000,
-  timeout: 60000,
 };
 
 // Create connection pool
@@ -1672,12 +1670,12 @@ app.post('/api/admin/login', async (req, res) => {
       });
     }
 
-    // Check if account is locked
-    if (admin.locked_until && new Date(admin.locked_until) > new Date()) {
-      return res.status(423).json({
-        error: 'Account is temporarily locked due to too many failed login attempts'
-      });
-    }
+    // Account locking feature deactivated
+    // if (admin.locked_until && new Date(admin.locked_until) > new Date()) {
+    //   return res.status(423).json({
+    //     error: 'Account is temporarily locked due to too many failed login attempts'
+    //   });
+    // }
 
     // Verify password
     const isValidPassword = await verifyPassword(password, admin.password_hash);
@@ -1830,8 +1828,17 @@ app.put('/api/admin/password', async (req, res) => {
       return res.status(401).json({ error: 'Admin account not found' });
     }
 
+    // Get password hash for verification
+    const passwordQuery = `SELECT password_hash FROM admin_users WHERE id = ?`;
+    const [passwordResult] = await pool.execute(passwordQuery, [decoded.adminId]);
+    const passwordHash = passwordResult[0]?.password_hash;
+
+    if (!passwordHash) {
+      return res.status(401).json({ error: 'Admin account not found' });
+    }
+
     // Verify current password
-    const isCurrentPasswordValid = await verifyPassword(currentPassword, admin.password_hash);
+    const isCurrentPasswordValid = await verifyPassword(currentPassword, passwordHash);
 
     if (!isCurrentPasswordValid) {
       return res.status(401).json({
@@ -2006,7 +2013,7 @@ const updateAdminLoginAttempts = async (username, success, ipAddress = null) => 
       `;
       await pool.execute(query, [username]);
     } else {
-      // Increment login attempts
+      // Increment login attempts (but don't lock account)
       const query = `
         UPDATE admin_users
         SET login_attempts = login_attempts + 1
@@ -2014,28 +2021,22 @@ const updateAdminLoginAttempts = async (username, success, ipAddress = null) => 
       `;
       await pool.execute(query, [username]);
 
-      // Check if account should be locked
-      const admin = await getAdminByUsername(username);
-      if (admin && admin.login_attempts >= 5) {
-        const lockoutMinutes = 30; // Could be configurable
-        const lockoutTime = new Date(Date.now() + lockoutMinutes * 60 * 1000);
-        const lockQuery = `
-          UPDATE admin_users
-          SET locked_until = ?
-          WHERE username = ?
-        `;
-        await pool.execute(lockQuery, [lockoutTime, username]);
-      }
+      // Account locking feature deactivated
+      // const admin = await getAdminByUsername(username);
+      // if (admin && admin.login_attempts >= 5) {
+      //   const lockoutMinutes = 30; // Could be configurable
+      //   const lockoutTime = new Date(Date.now() + lockoutMinutes * 60 * 1000);
+      //   const lockQuery = `
+      //     UPDATE admin_users
+      //     SET locked_until = ?
+      //     WHERE username = ?
+      //   `;
+      //   await pool.execute(lockQuery, [lockoutTime, username]);
+      // }
     }
 
-    // Log the attempt
-    if (ipAddress) {
-      const logQuery = `
-        INSERT INTO login_attempts (username, ip_address, success)
-        VALUES (?, ?, ?)
-      `;
-      await pool.execute(logQuery, [username, ipAddress, success]);
-    }
+    // Note: login_attempts table not implemented yet
+    // Log the attempt could be added later if needed
   } catch (error) {
     console.error('Error updating login attempts:', error);
   }
