@@ -23,7 +23,7 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
   // Check if SDK is loaded or enable mock mode
   useEffect(() => {
     let retryCount = 0;
-    const maxRetries = 3; // Reduced retries
+    const maxRetries = 5; // Increased retries
 
     const checkSdkAvailability = () => {
       const win = window as any;
@@ -109,15 +109,15 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
       } else {
         retryCount++;
         if (retryCount >= maxRetries) {
-          console.log("⚠️ SDK not found, enabling mock mode for testing");
+          console.log("⚠️ SDK not found after maximum retries, enabling mock mode for testing");
           setUseMockMode(true);
           setSdkLoaded(true);
           setStatus("Mock biometric device ready (SDK not available)");
           return;
         }
         setStatus(`Waiting for biometric SDK to load... (${retryCount}/${maxRetries})`);
-        // Retry after a short delay
-        setTimeout(checkSdkAvailability, 500);
+        // Retry after a longer delay
+        setTimeout(checkSdkAvailability, 1000);
       }
     };
 
@@ -144,7 +144,7 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
         setTimeout(async () => {
           try {
             console.log("🔍 Sending mock fingerprint for verification...");
-            const response = await fetch('http://localhost:3001/api/biometric/verify', {
+            const response = await fetch('http://localhost:52181/api/biometric/verify', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -171,8 +171,8 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
             }
           } catch (verifyError) {
             console.error("Mock verification request failed:", verifyError);
-            onAuthError("Mock verification service unavailable");
-            setStatus("Mock verification service error.");
+            onAuthError("Mock verification service unavailable. Please check: 1) DigitalPersona backend server is running on port 52181, 2) Network connectivity");
+            setStatus("Mock verification service error. Check console for details.");
           }
         }, 2000);
       }, 3000);
@@ -212,8 +212,16 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
       .then(() => setStatus("Place your finger on the scanner"))
       .catch((err) => {
         console.error("Device acquisition error:", err);
-        setStatus("Device not found or busy.");
-        onAuthError("Cannot start acquisition. Is the device plugged in?");
+        setStatus("Device not found or busy. Switching to mock mode...");
+
+        // Automatically switch to mock mode if device acquisition fails
+        setTimeout(() => {
+          console.log("🔄 Switching to mock mode due to device acquisition failure");
+          setUseMockMode(true);
+          setStatus("Mock biometric device ready (device acquisition failed)");
+        }, 2000);
+
+        onAuthError("Cannot start acquisition. Please check: 1) Device is connected, 2) DigitalPersona service is running, 3) Try refreshing the page");
       });
 
     // Subscribe to samples (only for real hardware)
@@ -309,7 +317,7 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
             // For verification mode, send fingerprint to verification service
             try {
               console.log("🔍 Sending fingerprint for verification...");
-              const response = await fetch('http://localhost:3001/api/biometric/verify', {
+              const response = await fetch('http://localhost:52181/api/biometric/verify', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -336,8 +344,8 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
               }
             } catch (verifyError) {
               console.error("Verification request failed:", verifyError);
-              onAuthError("Verification service unavailable");
-              setStatus("Verification service error.");
+              onAuthError("Verification service unavailable. Please check: 1) DigitalPersona backend server is running on port 52181, 2) Network connectivity, 3) Server logs for errors");
+              setStatus("Verification service error. Check console for details.");
             }
           } else {
             // For enrollment mode, return the captured fingerprint
