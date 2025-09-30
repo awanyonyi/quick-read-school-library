@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS students (
   admission_number VARCHAR(50) UNIQUE NOT NULL,
   email VARCHAR(255) UNIQUE,
   class VARCHAR(100),
-  blacklisted BOOLEAN DEFAULT FALSE,
+  blacklisted TINYINT(1) DEFAULT 0,
   blacklist_until DATETIME NULL,
   blacklist_reason TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS books (
   author VARCHAR(255) NOT NULL,
   category VARCHAR(100),
   due_period_value INT DEFAULT 24,
-  due_period_unit VARCHAR(20) DEFAULT 'hours' CHECK (due_period_unit IN ('hours', 'days', 'weeks', 'months', 'years')),
+  due_period_unit VARCHAR(20) DEFAULT 'hours',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_title (title),
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS book_copies (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   book_id VARCHAR(36) NOT NULL,
   isbn VARCHAR(20) UNIQUE NOT NULL,
-  status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available', 'borrowed', 'lost', 'damaged')),
+  status VARCHAR(20) DEFAULT 'available',
   condition_notes TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -60,9 +60,9 @@ CREATE TABLE IF NOT EXISTS borrow_records (
   borrow_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   due_date TIMESTAMP NOT NULL,
   return_date TIMESTAMP NULL,
-  status VARCHAR(20) DEFAULT 'borrowed' CHECK (status IN ('borrowed', 'returned', 'overdue')),
+  status VARCHAR(20) DEFAULT 'borrowed',
   fine_amount DECIMAL(10,2) DEFAULT 0,
-  fine_paid BOOLEAN DEFAULT FALSE,
+  fine_paid TINYINT(1) DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (book_copy_id) REFERENCES book_copies(id) ON DELETE CASCADE,
@@ -79,13 +79,13 @@ CREATE TABLE IF NOT EXISTS biometric_verification_logs (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   student_id VARCHAR(36) NOT NULL,
   book_copy_id VARCHAR(36) NULL,
-  verification_type VARCHAR(20) NOT NULL CHECK (verification_type IN ('book_issue', 'book_return', 'enrollment', 'verification')),
-  verification_method VARCHAR(20) NOT NULL CHECK (verification_method IN ('fingerprint', 'face', 'card')),
-  verification_status VARCHAR(20) NOT NULL CHECK (verification_status IN ('success', 'failed')),
+  verification_type VARCHAR(20) NOT NULL,
+  verification_method VARCHAR(20) NOT NULL,
+  verification_status VARCHAR(20) NOT NULL,
   verified_by VARCHAR(255),
   verification_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   borrow_record_id VARCHAR(36) NULL,
-  additional_data JSON,
+  additional_data TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS user_roles (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   name VARCHAR(100) UNIQUE NOT NULL,
   description TEXT,
-  permissions JSON,
+  permissions TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS user_roles (
 CREATE TABLE IF NOT EXISTS system_settings (
   id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   setting_key VARCHAR(255) UNIQUE NOT NULL,
-  setting_value JSON,
+  setting_value TEXT,
   description TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -210,7 +210,7 @@ BEGIN
   UPDATE students
   SET
     blacklisted = TRUE,
-    blacklist_until = DATE_ADD(CURRENT_DATE, INTERVAL 7 DAY),
+    blacklist_until = DATE_ADD(CURRENT_DATE, INTERVAL 14 DAY),
     blacklist_reason = 'Automatic blacklist due to overdue books'
   WHERE id IN (
     SELECT DISTINCT br.student_id
@@ -233,9 +233,9 @@ END;
 DELIMITER ;
 
 -- Create event to run auto-blacklist procedure daily
--- CREATE EVENT daily_auto_blacklist
--- ON SCHEDULE EVERY 1 DAY STARTS '2024-01-01 00:00:00'
--- DO CALL auto_blacklist_overdue_students();
+CREATE EVENT IF NOT EXISTS daily_auto_blacklist
+ON SCHEDULE EVERY 1 DAY STARTS DATE_ADD(DATE(CURRENT_TIMESTAMP), INTERVAL 1 DAY)
+DO CALL auto_blacklist_overdue_students();
 
 -- Admin actions audit log table
 CREATE TABLE IF NOT EXISTS admin_actions (
@@ -244,7 +244,7 @@ CREATE TABLE IF NOT EXISTS admin_actions (
   action_type VARCHAR(50) NOT NULL,
   target_type VARCHAR(50) NOT NULL,
   target_id VARCHAR(36) NOT NULL,
-  action_details JSON,
+  action_details TEXT,
   ip_address VARCHAR(45),
   user_agent TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -256,4 +256,4 @@ CREATE TABLE IF NOT EXISTS admin_actions (
 );
 
 -- Enable event scheduler
--- SET GLOBAL event_scheduler = ON;
+SET GLOBAL event_scheduler = ON;

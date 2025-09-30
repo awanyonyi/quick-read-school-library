@@ -7,6 +7,9 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// Middleware to parse JSON bodies
+app.use(express.json());
+
 // Serve static files from the parent directory (to serve the SDK files)
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -239,7 +242,7 @@ wss.on('connection', (ws, req) => {
   }));
 });
 
-const PORT = process.env.PORT || 52181;
+const PORT = process.env.PORT || 52182;
 const HOST = process.env.HOST || '127.0.0.1';
 
 server.listen(PORT, HOST, () => {

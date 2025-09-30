@@ -222,7 +222,7 @@ const calculateDueDate = (
   return borrow.toISOString();
 };
 
-// Function to check and auto-blacklist overdue students with enhanced logic
+// Function to check and auto-blacklist overdue students with 14-day fixed period
 const processOverdueBooks = async () => {
   try {
     // First, update borrow records status to overdue (with 1-day grace period)
@@ -239,15 +239,14 @@ const processOverdueBooks = async () => {
       console.log(`📅 Marked ${overdueCount} borrow records as overdue`);
     }
 
-    // Get students with overdue books and calculate severity
-    const severityQuery = `
-      SELECT
+    // Get students with overdue books
+    const overdueStudentsQuery = `
+      SELECT DISTINCT
         br.student_id,
         s.name as student_name,
         s.admission_number,
         COUNT(br.id) as overdue_books_count,
-        MAX(DATEDIFF(NOW(), br.due_date)) as max_days_overdue,
-        AVG(DATEDIFF(NOW(), br.due_date)) as avg_days_overdue
+        MAX(DATEDIFF(NOW(), br.due_date)) as max_days_overdue
       FROM borrow_records br
       JOIN students s ON br.student_id = s.id
       WHERE br.status = 'overdue'
@@ -256,37 +255,24 @@ const processOverdueBooks = async () => {
       )
       GROUP BY br.student_id, s.name, s.admission_number
     `;
-    const [severityResult] = await pool.execute(severityQuery);
-    const overdueStudents = severityResult as any[];
+    const [overdueStudentsResult] = await pool.execute(overdueStudentsQuery);
+    const overdueStudents = overdueStudentsResult as any[];
 
-    // Process each overdue student with severity-based blacklisting
+    // Blacklist students with overdue books for 14 days
     for (const student of overdueStudents) {
-      let blacklistDays = 7; // Base duration
-      let severity = 'low';
-
-      // Determine severity and duration based on overdue metrics
-      if (student.overdue_books_count >= 3 || student.max_days_overdue >= 14) {
-        blacklistDays = 21; // High severity: 3 weeks
-        severity = 'high';
-      } else if (student.overdue_books_count >= 2 || student.max_days_overdue >= 7) {
-        blacklistDays = 14; // Medium severity: 2 weeks
-        severity = 'medium';
-      }
-
-      // Apply blacklist with severity-based duration
       const blacklistQuery = `
         UPDATE students
         SET
           blacklisted = TRUE,
-          blacklist_until = DATE_ADD(CURRENT_DATE, INTERVAL ${blacklistDays} DAY),
-          blacklist_reason = 'Automatic blacklist due to overdue books - ${severity} severity (${student.overdue_books_count} books, max ${student.max_days_overdue} days overdue) - ${blacklistDays} day suspension',
+          blacklist_until = DATE_ADD(CURRENT_DATE, INTERVAL 14 DAY),
+          blacklist_reason = 'Automatic blacklist due to overdue books (${student.overdue_books_count} books, max ${student.max_days_overdue} days overdue) - 14 day suspension',
           updated_at = NOW()
         WHERE id = ?
       `;
 
       await pool.execute(blacklistQuery, [student.student_id]);
 
-      console.log(`🚫 Blacklisted student ${student.student_name} (${student.admission_number}) for ${blacklistDays} days - ${severity} severity`);
+      console.log(`🚫 Blacklisted student ${student.student_name} (${student.admission_number}) for 14 days due to overdue books`);
     }
 
     // Auto-unblacklist students who have returned all overdue books

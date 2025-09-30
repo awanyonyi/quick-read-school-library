@@ -144,7 +144,7 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
         setTimeout(async () => {
           try {
             console.log("🔍 Sending mock fingerprint for verification...");
-            const response = await fetch('http://localhost:52181/api/biometric/verify', {
+            const response = await fetch('http://localhost:52182/api/biometric/verify', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -171,7 +171,7 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
             }
           } catch (verifyError) {
             console.error("Mock verification request failed:", verifyError);
-            onAuthError("Mock verification service unavailable. Please check: 1) DigitalPersona backend server is running on port 52181, 2) Network connectivity");
+            onAuthError("Mock verification service unavailable. Please check: 1) DigitalPersona backend server is running on port 52182, 2) Network connectivity");
             setStatus("Mock verification service error. Check console for details.");
           }
         }, 2000);
@@ -184,13 +184,41 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
 
     // Listen for device connections
     reader.onDeviceConnected = (device) => {
-      console.log("Fingerprint reader connected:", device);
+      console.log("✅ Fingerprint reader connected:", device);
       setStatus("Fingerprint reader connected. Ready to scan.");
     };
 
     reader.onDeviceDisconnected = (device) => {
-      console.warn("Fingerprint reader disconnected.");
+      console.warn("⚠️ Fingerprint reader disconnected:", device);
       setStatus("Device disconnected. Please reconnect.");
+    };
+
+    // Add connection failure handler
+    reader.onConnectionFailed = (error) => {
+      console.error("❌ Device connection failed:", error);
+      setStatus("Device connection failed. Switching to mock mode...");
+
+      setTimeout(() => {
+        console.log("🔄 Switching to mock mode due to connection failure");
+        setUseMockMode(true);
+        setStatus("Mock biometric device ready (connection failed)");
+      }, 2000);
+
+      onAuthError(`Device connection failed: ${error.message || error}. Please check device connection and try again.`);
+    };
+
+    // Add communication failure handler
+    reader.onCommunicationFailed = (error) => {
+      console.error("❌ Device communication failed:", error);
+      setStatus("Device communication failed. Switching to mock mode...");
+
+      setTimeout(() => {
+        console.log("🔄 Switching to mock mode due to communication failure");
+        setUseMockMode(true);
+        setStatus("Mock biometric device ready (communication failed)");
+      }, 2000);
+
+      onAuthError(`Device communication failed: ${error.message || error}. Please check device connection and restart the browser.`);
     };
 
     // Start acquisition when mounted
@@ -209,9 +237,21 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
 
     reader
       .startAcquisition(sampleFormat)
-      .then(() => setStatus("Place your finger on the scanner"))
+      .then(() => {
+        console.log("✅ Device acquisition started successfully");
+        setStatus("Place your finger on the scanner");
+      })
       .catch((err) => {
-        console.error("Device acquisition error:", err);
+        console.error("❌ Device acquisition error:", err);
+        console.error("Error details:", {
+          message: err.message,
+          name: err.name,
+          stack: err.stack,
+          sampleFormat: sampleFormat,
+          readerType: typeof reader,
+          readerMethods: reader ? Object.getOwnPropertyNames(Object.getPrototypeOf(reader)) : 'undefined'
+        });
+
         setStatus("Device not found or busy. Switching to mock mode...");
 
         // Automatically switch to mock mode if device acquisition fails
@@ -221,7 +261,7 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
           setStatus("Mock biometric device ready (device acquisition failed)");
         }, 2000);
 
-        onAuthError("Cannot start acquisition. Please check: 1) Device is connected, 2) DigitalPersona service is running, 3) Try refreshing the page");
+        onAuthError(`Cannot start acquisition: ${err.message}. Please check: 1) Device is connected, 2) DigitalPersona service is running, 3) Try refreshing the page`);
       });
 
     // Subscribe to samples (only for real hardware)
@@ -317,7 +357,7 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
             // For verification mode, send fingerprint to verification service
             try {
               console.log("🔍 Sending fingerprint for verification...");
-              const response = await fetch('http://localhost:52181/api/biometric/verify', {
+              const response = await fetch('http://localhost:52182/api/biometric/verify', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -344,7 +384,7 @@ export const BiometricAuth: React.FC<BiometricAuthProps> = ({
               }
             } catch (verifyError) {
               console.error("Verification request failed:", verifyError);
-              onAuthError("Verification service unavailable. Please check: 1) DigitalPersona backend server is running on port 52181, 2) Network connectivity, 3) Server logs for errors");
+              onAuthError("Verification service unavailable. Please check: 1) DigitalPersona backend server is running on port 52182, 2) Network connectivity, 3) Server logs for errors");
               setStatus("Verification service error. Check console for details.");
             }
           } else {

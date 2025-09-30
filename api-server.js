@@ -457,6 +457,34 @@ app.put('/api/books/:bookId', async (req, res) => {
   }
 });
 
+// Get single student by ID
+app.get('/api/students/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    if (useMockData) {
+      const students = await mockDataProvider.fetchStudents();
+      const student = students.find(s => s.id === studentId);
+      if (!student) {
+        return res.status(404).json({ error: 'Student not found' });
+      }
+      res.json(student);
+    } else {
+      const query = `SELECT * FROM students WHERE id = ?`;
+      const [rows] = await pool.execute(query, [studentId]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Student not found' });
+      }
+
+      res.json(rows[0]);
+    }
+  } catch (error) {
+    console.error('Error fetching student:', error);
+    res.status(500).json({ error: 'Failed to fetch student' });
+  }
+});
+
 // Students routes
 app.get('/api/students', async (req, res) => {
   try {
@@ -1425,6 +1453,114 @@ app.post('/api/biometric/verify', async (req, res) => {
   }
 });
 
+// Process overdue books and update blacklist
+app.post('/api/process-overdue', async (req, res) => {
+  try {
+    if (useMockData) {
+      res.json({
+        success: true,
+        message: 'Mock overdue processing completed',
+        blacklistedCount: 0,
+        updatedCount: 0,
+        totalOverdueRecords: 0,
+        affectedStudents: 0
+      });
+    } else {
+      console.log('🔍 Processing overdue books and updating blacklist...');
+
+      // Get all borrow records and students
+      const [borrowRecords, students] = await Promise.all([
+        pool.execute(`
+          SELECT * FROM borrow_records
+          WHERE status = 'borrowed' AND due_date < NOW()
+        `),
+        pool.execute('SELECT * FROM students')
+      ]);
+
+      const overdueRecords = borrowRecords[0];
+      const studentsData = students[0];
+
+      const now = new Date();
+      const studentOverdueCount = new Map();
+
+      // Group overdue records by student
+      overdueRecords.forEach(record => {
+        if (!studentOverdueCount.has(record.student_id)) {
+          studentOverdueCount.set(record.student_id, []);
+        }
+        studentOverdueCount.get(record.student_id).push(record);
+      });
+
+      let blacklistedCount = 0;
+      let updatedCount = 0;
+
+      // Process each student with overdue books
+      for (const [studentId, records] of studentOverdueCount) {
+        const student = studentsData.find(s => s.id === studentId);
+        if (!student) continue;
+
+        // Calculate days overdue for the most overdue book
+        const mostOverdueRecord = records.reduce((prev, current) => {
+          const prevDays = Math.floor((now.getTime() - new Date(prev.due_date).getTime()) / (1000 * 60 * 60 * 24));
+          const currentDays = Math.floor((now.getTime() - new Date(current.due_date).getTime()) / (1000 * 60 * 60 * 24));
+          return currentDays > prevDays ? current : prev;
+        });
+
+        const daysOverdue = Math.floor((now.getTime() - new Date(mostOverdueRecord.due_date).getTime()) / (1000 * 60 * 60 * 24));
+
+        // Blacklist students with overdue books for 14 days
+        if (!student.blacklisted) {
+          const blacklistUntil = new Date();
+          blacklistUntil.setDate(blacklistUntil.getDate() + 14);
+
+          const blacklistReason = `Automatic blacklist due to overdue books (${records.length} books, max ${daysOverdue} days overdue) - 14 day suspension`;
+
+          const updateData = {
+            blacklisted: true,
+            blacklist_until: blacklistUntil.toISOString(),
+            blacklist_reason: blacklistReason,
+            blacklist_date: now.toISOString()
+          };
+
+          await pool.execute(`
+            UPDATE students
+            SET blacklisted = ?, blacklist_until = ?, blacklist_reason = ?, updated_at = NOW()
+            WHERE id = ?
+          `, [true, blacklistUntil.toISOString(), blacklistReason, studentId]);
+
+          blacklistedCount++;
+          console.log(`🚫 Blacklisted student ${student.name} (${studentId}) for 14 days: ${blacklistReason}`);
+        } else {
+          updatedCount++;
+          console.log(`📝 Updated blacklist status for ${student.name} (${studentId})`);
+        }
+      }
+
+      // Update borrow records status to overdue
+      if (overdueRecords.length > 0) {
+        await pool.execute(`
+          UPDATE borrow_records
+          SET status = 'overdue', updated_at = NOW()
+          WHERE status = 'borrowed' AND due_date < NOW()
+        `);
+      }
+
+      console.log(`✅ Blacklist processing complete: ${blacklistedCount} students blacklisted, ${updatedCount} updated`);
+
+      res.json({
+        success: true,
+        blacklistedCount,
+        updatedCount,
+        totalOverdueRecords: overdueRecords.length,
+        affectedStudents: studentOverdueCount.size
+      });
+    }
+  } catch (error) {
+    console.error('Error processing overdue books:', error);
+    res.status(500).json({ error: 'Failed to process overdue books' });
+  }
+});
+
 // Borrowing routes
 app.get('/api/borrowing', async (req, res) => {
   try {
@@ -2077,8 +2213,9 @@ const updateAdminUsername = async (adminId, newUsername) => {
 const startServer = async () => {
   const dbConnected = await testConnection();
 
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 API Server running on http://localhost:${PORT}`);
+    console.log(`🌐 API Server accessible from network at http://YOUR_IP_ADDRESS:${PORT}`);
     if (useMockData) {
       console.log('📊 Using mock data for development (MySQL not available)');
     } else {
@@ -2088,6 +2225,7 @@ const startServer = async () => {
     console.log(`👥 Students API: http://localhost:${PORT}/api/students`);
     console.log(`📖 Borrowing API: http://localhost:${PORT}/api/borrowing`);
     console.log(`🔐 Biometric API: http://localhost:${PORT}/api/students/:id/biometric`);
+    console.log(`🔗 Network access: http://YOUR_IP_ADDRESS:${PORT}/api/books`);
   });
 };
 

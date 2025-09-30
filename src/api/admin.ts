@@ -233,6 +233,47 @@ export const getAdminProfile = async (req: Request, res: Response) => {
   }
 };
 
+// Log admin action to database
+export const logAdminAction = async (
+  adminId: string,
+  actionType: string,
+  targetType: string,
+  targetId: string,
+  actionDetails: any,
+  ipAddress?: string,
+  userAgent?: string
+) => {
+  try {
+    // Import the database connection
+    const pool = require('../config/mysql').default;
+
+    const query = `
+      INSERT INTO admin_actions (
+        id, admin_id, action_type, target_type, target_id, action_details,
+        ip_address, user_agent, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    `;
+
+    const actionId = crypto.randomUUID();
+    await pool.execute(query, [
+      actionId,
+      adminId,
+      actionType,
+      targetType,
+      targetId,
+      JSON.stringify(actionDetails),
+      ipAddress || 'unknown',
+      userAgent || 'unknown'
+    ]);
+
+    console.log(`📋 Admin action logged: ${actionType} on ${targetType} ${targetId}`);
+    return { success: true, actionId };
+  } catch (error) {
+    console.error('Error logging admin action:', error);
+    return { success: false, error };
+  }
+};
+
 // Middleware to verify admin authentication (simplified)
 export const requireAdminAuth = async (req: Request, res: Response, next: Function) => {
   try {

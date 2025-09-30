@@ -95,6 +95,13 @@ class ApiClient {
     });
   }
 
+  // Process overdue books and update blacklist
+  async processOverdueBooks(): Promise<any> {
+    return this.request('/process-overdue', {
+      method: 'POST',
+    });
+  }
+
   // Biometric enrollment
   async updateBiometricData(studentId: string, biometricData: any): Promise<any> {
     return this.request(`/students/${studentId}/biometric`, {

@@ -208,6 +208,14 @@ export const unblacklistStudent = async (studentId: string, reason: string) => {
   }
 
   try {
+    // Get student info before unblacklisting for logging
+    const students = await apiClient.getStudents();
+    const student = students.find((s: any) => s.id === studentId);
+
+    if (!student) {
+      throw new Error('Student not found');
+    }
+
     // Update student record to remove blacklist
     const updateData = {
       blacklisted: false,
@@ -218,7 +226,31 @@ export const unblacklistStudent = async (studentId: string, reason: string) => {
     };
 
     await apiClient.updateStudent(studentId, updateData);
-    console.log(`✅ Student ${studentId} unblacklisted with reason: ${reason}`);
+
+    // Log the admin action
+    try {
+      const { logAdminAction } = await import('../api/admin');
+      await logAdminAction(
+        'admin-1', // Admin ID
+        'unblacklist_student',
+        'student',
+        studentId,
+        {
+          student_name: student.name,
+          student_admission_number: student.admission_number,
+          previous_blacklist_reason: student.blacklist_reason,
+          unblacklist_reason: reason,
+          unblacklist_date: new Date().toISOString()
+        },
+        'system', // IP address
+        'system'  // User agent
+      );
+    } catch (logError) {
+      console.warn('Failed to log admin action:', logError);
+      // Don't fail the unblacklist operation if logging fails
+    }
+
+    console.log(`✅ Student ${student.name} (${studentId}) unblacklisted with reason: ${reason}`);
     return { success: true };
   } catch (error) {
     console.error('Error unblacklisting student:', error);
@@ -239,6 +271,11 @@ export const processOverdueBooks = async () => {
       apiClient.getBorrowRecords(),
       apiClient.getStudents()
     ]);
+
+    // Process overdue books using the API
+    const result = await apiClient.processOverdueBooks();
+    console.log('✅ API overdue processing result:', result);
+    return result;
 
     const now = new Date();
     const overdueRecords = borrowRecords.filter(record =>
@@ -271,22 +308,12 @@ export const processOverdueBooks = async () => {
 
       const daysOverdue = Math.floor((now.getTime() - new Date(mostOverdueRecord.due_date).getTime()) / (1000 * 60 * 60 * 24));
 
-      // Blacklist criteria: 3+ overdue books OR any book overdue by 7+ days
-      const shouldBlacklist = records.length >= 3 || daysOverdue >= 7;
-
-      if (shouldBlacklist && !student.blacklisted) {
-        // Calculate blacklist duration based on severity
-        let blacklistDays = 7; // Default 1 week
-        if (records.length >= 5 || daysOverdue >= 14) {
-          blacklistDays = 30; // 1 month for severe cases
-        } else if (records.length >= 3 || daysOverdue >= 7) {
-          blacklistDays = 14; // 2 weeks for moderate cases
-        }
-
+      // Blacklist students with overdue books for 14 days
+      if (!student.blacklisted) {
         const blacklistUntil = new Date();
-        blacklistUntil.setDate(blacklistUntil.getDate() + blacklistDays);
+        blacklistUntil.setDate(blacklistUntil.getDate() + 14);
 
-        const blacklistReason = `Overdue books: ${records.length} book(s), most overdue by ${daysOverdue} day(s)`;
+        const blacklistReason = `Automatic blacklist due to overdue books (${records.length} books, max ${daysOverdue} days overdue) - 14 day suspension`;
 
         const updateData = {
           blacklisted: true,
@@ -297,12 +324,8 @@ export const processOverdueBooks = async () => {
 
         await apiClient.updateStudent(studentId, updateData);
         blacklistedCount++;
-        console.log(`🚫 Blacklisted student ${student.name} (${studentId}) for ${blacklistDays} days: ${blacklistReason}`);
-      } else if (student.blacklisted && !shouldBlacklist) {
-        // Student is blacklisted but no longer meets criteria - could unblacklist automatically
-        // For now, we'll leave this manual to avoid accidental unblacklisting
-        console.log(`⚠️ Student ${student.name} (${studentId}) has ${records.length} overdue book(s), ${daysOverdue} days overdue - manual review recommended`);
-      } else if (student.blacklisted) {
+        console.log(`🚫 Blacklisted student ${student.name} (${studentId}) for 14 days: ${blacklistReason}`);
+      } else {
         updatedCount++;
         console.log(`📝 Updated blacklist status for ${student.name} (${studentId})`);
       }
