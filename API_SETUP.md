@@ -47,13 +47,28 @@ You should see:
 ```
 
 ### 5. Start the Frontend (in a separate terminal)
-```bash
-npm run dev
-```
+ ```bash
+ npm run dev
+ ```
+
+### 6. Set Up Admin Authentication (Optional)
+ ```bash
+ # Set up admin authentication system
+ npm run setup-admin-security
+
+ # Test admin login
+ node scripts/test-admin-login.js
+ ```
+
+ **Default Admin Credentials:**
+ - Username: `Maryland_library`
+ - Password: `***Sheila_library***`
+
+ See [ADMIN_LOGIN_SETUP.md](../ADMIN_LOGIN_SETUP.md) for comprehensive admin setup instructions.
 
 ## 📋 Available Scripts
 
-- `npm run dev` - Start the Vite development server (port 8080)
+- `npm run dev` - Start the Vite development server (port 5173)
 - `npm run api` - Start the API server (port 3001)
 - `npm run build` - Build the frontend for production
 - `npm run setup` - Run setup checks
@@ -75,6 +90,14 @@ npm run dev
 - `POST /api/borrowing` - Create a new borrow record
 - `PUT /api/borrowing/:recordId/return` - Return a book
 
+### Admin Authentication
+- `POST /api/admin/login` - Admin login
+- `GET /api/admin/verify` - Verify admin session token
+- `GET /api/admin/profile` - Get admin profile information
+- `PUT /api/admin/password` - Change admin password
+- `PUT /api/admin/username` - Change admin username
+- `POST /api/admin/logout` - Logout admin session
+
 ## 🐛 Troubleshooting
 
 ### "Failed to fetch" Error
@@ -93,8 +116,16 @@ If the API server fails to start:
 ### CORS Issues
 If you see CORS-related errors:
 1. The API server includes CORS middleware by default
-2. Make sure you're accessing the frontend from `http://localhost:8080`
+2. Make sure you're accessing the frontend from `http://localhost:5173`
 3. The API server runs on `http://localhost:3001`
+
+### Admin Authentication Issues
+If you encounter admin login problems:
+1. Verify default credentials: `Maryland_library` / `***Sheila_library***`
+2. Ensure admin setup script has been run: `npm run setup-admin-security`
+3. Check API server is running on port 3001
+4. Verify JWT_SECRET is set in environment variables
+5. See [ADMIN_LOGIN_SETUP.md](../ADMIN_LOGIN_SETUP.md) for detailed troubleshooting
 
 ## 🔒 Security Notes
 
@@ -102,6 +133,8 @@ If you see CORS-related errors:
 - Biometric data is stored as JSON in the database
 - All API endpoints validate input data
 - Database credentials should never be committed to version control
+- Admin authentication uses JWT tokens with 8-hour expiration
+- See [ADMIN_SECURITY_README.md](../ADMIN_SECURITY_README.md) for comprehensive security documentation
 
 ## 📊 Database Schema
 
@@ -112,3 +145,9 @@ The application uses the following main tables:
 - `biometric_verification_logs` - Biometric authentication logs
 
 See `database/mysql-schema-simple.sql` for the complete schema.
+
+## 📚 Additional Resources
+
+- [README.md](../README.md) - Main project documentation and setup guide
+- [ADMIN_LOGIN_SETUP.md](../ADMIN_LOGIN_SETUP.md) - Complete admin setup guide
+- [ADMIN_SECURITY_README.md](../ADMIN_SECURITY_README.md) - Admin security documentation

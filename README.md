@@ -8,8 +8,26 @@ A modern, secure library management system with biometric authentication built w
 - 👥 **Student Management** - Manage student records and profiles
 - 📚 **Borrowing System** - Issue and return books with due date tracking
 - 🔐 **Biometric Authentication** - Secure login using fingerprint/face recognition
+- 👑 **Admin Authentication** - Secure admin access with JWT-based authentication
 - 📊 **Dashboard Analytics** - Real-time statistics and reports
 - 🎨 **Modern UI** - Beautiful interface built with Tailwind CSS and shadcn/ui
+
+## 🔐 Admin Authentication
+
+The system includes a comprehensive admin authentication system with the following features:
+
+- **Secure Login** - JWT-based authentication with 8-hour token expiration
+- **Default Credentials**:
+  - Username: `Maryland_library`
+  - Password: `Sheila_library`
+- **Password Management** - Change password and username functionality
+- **Session Tracking** - Monitor active sessions and login attempts
+
+### Admin Setup
+
+See [ADMIN_LOGIN_SETUP.md](./ADMIN_LOGIN_SETUP.md) for comprehensive admin setup instructions.
+
+**⚠️ Important:** Change the default admin password immediately after first login for security.
 
 ## 🚀 Quick Start
 
@@ -63,8 +81,17 @@ A modern, secure library management system with biometric authentication built w
    ```
 
 5. **Access the Application**
-   - Frontend: http://localhost:8080
+   - Frontend: http://localhost:5173
    - API Server: http://localhost:3001
+
+6. **Admin Setup** (Optional)
+   ```bash
+   # Set up admin authentication
+   npm run setup-admin-security
+
+   # Test admin login
+   node scripts/test-admin-login.js
+   ```
 
 ## 📋 API Documentation
 
@@ -94,10 +121,11 @@ See [API_SETUP.md](./API_SETUP.md) for comprehensive API documentation and setup
 
 ## 🔧 Available Scripts
 
-- `npm run dev` - Start development server
-- `npm run api` - Start API server
+- `npm run dev` - Start development server (port 5173)
+- `npm run api` - Start API server (port 3001)
 - `npm run build` - Build for production
 - `npm run setup` - Run setup checks
+- `npm run setup-admin-security` - Set up admin authentication
 - `npm run migrate` - Migrate from Supabase
 
 ## 🔒 Security Features
@@ -126,10 +154,25 @@ See [API_SETUP.md](./API_SETUP.md) for comprehensive API documentation and setup
    - Verify device drivers
    - Test with browser console
 
-See [API_SETUP.md](./API_SETUP.md) for detailed troubleshooting.
+4. **Admin Login Issues**
+   - Verify default credentials: `Maryland_library` / `Sheila_library`
+   - Check that admin setup script has been run
+   - Ensure API server is running on port 3001
+   - See [ADMIN_LOGIN_SETUP.md](./ADMIN_LOGIN_SETUP.md) for detailed admin troubleshooting
+
+See [API_SETUP.md](./API_SETUP.md) for detailed API documentation and troubleshooting.
+
+## 📚 Additional Documentation
+
+- [ADMIN_LOGIN_SETUP.md](./ADMIN_LOGIN_SETUP.md) - Complete admin authentication setup guide
+- [ADMIN_SECURITY_README.md](./ADMIN_SECURITY_README.md) - Admin security best practices and guidelines
+- [BIOMETRIC-IMAGES-README.md](./BIOMETRIC-IMAGES-README.md) - Biometric image handling documentation
+- [BLACKLISTING-README.md](./BLACKLISTING-README.md) - Student blacklisting system documentation
+- [DIGITALPERSONA-TROUBLESHOOTING.md](./DIGITALPERSONA-TROUBLESHOOTING.md) - Biometric device troubleshooting
 
 ## 📈 Recent Updates
 
+- ✅ **Admin Authentication System** - Complete JWT-based admin login with password management
 - ✅ **Fixed 500 Internal Server Error** - Separated server-side code from client bundle
 - ✅ **Added API Server** - Dedicated backend for database operations
 - ✅ **Biometric Integration** - Complete biometric enrollment and verification
